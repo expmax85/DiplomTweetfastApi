@@ -1,4 +1,8 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
+
+
+class Like(BaseModel):
+    user_id: int
 
 
 class UserBase(BaseModel):
@@ -9,16 +13,26 @@ class UserCreate(UserBase):
     pass
 
 
+class UserUpdate(UserBase):
+    pass
+
+
 class User(UserBase):
     id: int
-    pid: list = None
+    followers: list = []
+    following: list = Field([], alias='followed')
 
     class Config:
         orm_mode = True
 
 
+class UserInfo(BaseModel):
+    result: bool = True
+    user: User
+
+
 class TweetBase(BaseModel):
-    tweet_data: str
+    content: str = Field(alias='tweet_data')
 
 
 class TweetCreate(TweetBase):
@@ -31,21 +45,24 @@ class TweetUpdate(TweetBase):
 
 class Tweet(TweetBase):
     id: int
+    likes: list = []
+    author: User
+    attachments: list = Field([], alias='images')
+
 
     class Config:
         orm_mode = True
 
 
-class TokenBase(BaseModel):
-    api_key: str
+class Tweets(BaseModel):
+    result: bool = True
+    tweets: list[Tweet]
 
 
-class TokenCreate(TokenBase):
-    pass
+class TweetSuccess(BaseModel):
+    result: bool = True
+    tweet_id: int
 
 
-class Token(TokenBase):
-    id: int
-
-    class Config:
-        orm_mode = True
+class Success(BaseModel):
+    result: bool = True

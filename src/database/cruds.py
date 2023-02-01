@@ -3,8 +3,9 @@ from pydantic import BaseModel
 from pydantic.schema import Generic, TypeVar
 from sqlalchemy.orm import Session
 
-from src.models import Base, Tweet
+from src.models import Base, Tweet, User
 from src.models import schemas
+from src.models.models import Like
 
 ModelType = TypeVar("ModelType", bound=Base)
 CreateSchemaType = TypeVar("CreateSchemaType", bound=BaseModel)
@@ -14,7 +15,7 @@ UpdateSchemaType = TypeVar("UpdateSchemaType", bound=BaseModel)
 class BaseCRUD(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
     model = None
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, **kwargs) -> None:
         if not self.model:
             raise AttributeError('Need to define model')
 
@@ -47,5 +48,21 @@ class BaseCRUD(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
 class TweetAction(BaseCRUD[Tweet, schemas.TweetCreate, schemas.TweetUpdate]):
     model = Tweet
 
+    def create_like(self, db: Session, user_id: int, tweet_id: int) -> None:
+        like = Like(tweet_id=tweet_id, user_id=user_id)
+        db.add(like)
+        db.commit()
 
-tweet_orm = TweetAction()
+    def remove_like(self, db: Session, user_id: int, tweet_id: int) -> None:
+        like = db.query(Like).filter(Like.user_id == user_id,
+                                     Like.tweet_id == tweet_id).first()
+        db.delete(like)
+        db.commit()
+
+
+class UserAction(BaseCRUD[User, schemas.UserCreate, schemas.UserUpdate]):
+    model = User
+
+
+tweets_orm = TweetAction()
+users_orm = UserAction()
