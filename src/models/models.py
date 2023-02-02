@@ -18,15 +18,12 @@ class Tweet(Base):
     __tablename__ = 'tweets'
 
     id = Column(Integer, primary_key=True)
-    tweet_data = Column('tweet_data', String(100), nullable=False)
-    user_id = Column(Integer, ForeignKey('users.id', ondelete='cascade'))
+    tweet_data = Column('content', String(100), nullable=False)
+    user_id = Column(Integer, ForeignKey('users.id'))
 
     author = relationship('User', back_populates='tweets')
-    images = relationship('Media', back_populates='tweet')
-    likes = relationship('Like', back_populates='tweet_likes', lazy=True)
-
-    def is_author(self, user: 'User') -> bool:
-        return self.user_id == user.id
+    attachments = relationship('Media', back_populates='tweet')
+    likes = relationship('Like', back_populates='tweet')
 
 
 class Media(Base):
@@ -40,7 +37,7 @@ class Media(Base):
     image = Column(String, default='some')
     tweet_media_ids = Column(ForeignKey('tweets.id', ondelete='cascade'))
 
-    tweet = relationship('Tweet', back_populates='images')
+    tweet = relationship('Tweet', back_populates='attachments')
 
 
 followers = Table(
@@ -99,7 +96,6 @@ class Token(Base):
     id = Column(Integer, primary_key=True)
     user_id = Column(ForeignKey('users.id', ondelete='cascade'))
     api_key = Column(String(50), nullable=False)
-    token_type = Column(String(50))
 
 
 class Like(Base):
@@ -107,7 +103,7 @@ class Like(Base):
     user_id = Column(ForeignKey("users.id"), primary_key=True)
     tweet_id = Column(ForeignKey("tweets.id"), primary_key=True)
 
-    tweet_likes = relationship("Tweet", back_populates="likes")
+    tweet = relationship("Tweet", back_populates="likes")
     user_likes = relationship("User", back_populates="likes")
 
 

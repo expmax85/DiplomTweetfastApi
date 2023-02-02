@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 from src.models import Base, Tweet, User
 from src.models import schemas
 from src.models.models import Like
+from src.models.models import Media
 
 ModelType = TypeVar("ModelType", bound=Base)
 CreateSchemaType = TypeVar("CreateSchemaType", bound=BaseModel)
@@ -15,7 +16,7 @@ UpdateSchemaType = TypeVar("UpdateSchemaType", bound=BaseModel)
 class BaseCRUD(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
     model = None
 
-    def __init__(self, *args, **kwargs) -> None:
+    def __init__(self, *args, **kwargs):
         if not self.model:
             raise AttributeError('Need to define model')
 
@@ -64,5 +65,12 @@ class UserAction(BaseCRUD[User, schemas.UserCreate, schemas.UserUpdate]):
     model = User
 
 
+def create_image(db: Session, file: str, tweet_id) -> Media:
+    db_obj = Media(image=file, tweet_media_ids=1)
+    db.add(db_obj)
+    db.commit()
+    db.refresh(db_obj)
+    return db_obj
+
+
 tweets_orm = TweetAction()
-users_orm = UserAction()

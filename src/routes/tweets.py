@@ -1,9 +1,15 @@
-from fastapi import APIRouter, Depends
+import os
+import shutil
+
+from fastapi import APIRouter, Depends, UploadFile, File
 from sqlalchemy.orm import Session
 from starlette.responses import JSONResponse
 
+from src.config import settings
 from src.database import session, cruds
+from src.database.cruds import create_image
 from src.models import schemas, User
+from src.models.schemas import to_json
 from src.routes.users import get_user
 
 router = APIRouter()
@@ -14,6 +20,16 @@ async def create_tweet(tweet: schemas.TweetCreate, db: Session = Depends(session
                        user: User = Depends(get_user)):
     tweet = cruds.tweets_orm.create(db=db, obj_in=tweet, user_id=user.id)
     return JSONResponse({"result": True, "tweet_id": tweet.id}, status_code=201)
+
+
+@router.post("/medias", response_model=None)
+async def add_media(media: UploadFile = File(...), db: Session = Depends(session)):
+    path = os.path.join(settings.UPLOADS_DIR, media.filename)
+    with open(path, "wb") as wf:
+        shutil.copyfileobj(media.file, wf)
+        media.file.close()
+        image = create_image(db=db, file=str(path), tweet_id=1)
+    return {"result": True, "media_id": image.id}
 
 
 @router.delete("/tweets/{tweet_id}", response_model=schemas.Success)
@@ -38,12 +54,13 @@ def remove_like(tweet_id: int, db: Session = Depends(session), user: User = Depe
 
 @router.get("/tweets", response_model=schemas.Tweets)
 def get_tweets(db: Session = Depends(session)):
-    tweets = cruds.tweets_orm.get_all(db=db)
-    print(schemas.Tweets(result=True, tweets=tweets))
-    return {"result": True, "tweets": tweets}
-
-
-@router.post("/media")
-async def add_media(media, db: Session = Depends(session)):
-    return {"result": True, "media_id": 1}
-
+    tweets = cruds.tweets_orm.get_all(db)
+    tweets = schemas.Tweets(result=True, tweets=tweets)
+    tweets = to_json(tweets)
+    # print(schemas.Tweets(result=True, tweets=tweets))
+    return tweets
+    #     {"id": 1, "content": "string", "attachments": [], "author":
+    #         {"id": 1, "name": "string"},
+    #      "likes": [],
+    #      }
+    # ]}
