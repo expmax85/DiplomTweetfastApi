@@ -25,6 +25,10 @@ class Tweet(Base):
     attachments = relationship('Media', back_populates='tweet')
     likes = relationship('Like', back_populates='tweet')
 
+    def is_author(self, user: 'User') -> bool:
+        return self.user_id == user.id
+
+
 
 class Media(Base):
     """

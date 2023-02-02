@@ -74,3 +74,4 @@ def create_image(db: Session, file: str, tweet_id) -> Media:
 
 
 tweets_orm = TweetAction()
+users_orm = UserAction()

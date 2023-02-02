@@ -12,7 +12,7 @@ router = APIRouter()
 
 
 async def get_user(request: Request, db: Session = Depends(session)):
-    pprint(dict(request.headers), indent=2)
+    # pprint(dict(request.headers), indent=2)
     api_key = request.headers.get('api-key', 'test')
     token = db.query(Token).filter(Token.api_key == api_key).first()
     return token.user
@@ -24,10 +24,11 @@ async def add_follow(user_id: int, db: Session = Depends(session), user: User = 
     user.follow(followed_user)
     db.commit()
     db.refresh(user)
+    print(user.followed)
     return {"result": True}
 
 
-@router.delete("/users/{user_id}follow", response_model=schemas.Success)
+@router.delete("/users/{user_id}/follow", response_model=schemas.Success)
 async def remove_follow(user_id: int, db: Session = Depends(session), user: User = Depends(get_user)):
     followed_user = cruds.users_orm.get(db=db, id_obj=user_id)
     user.unfollow(followed_user)

@@ -1,10 +1,11 @@
-from pydantic import BaseModel, Field
+from fastapi.encoders import jsonable_encoder
+from pydantic import BaseModel
+from pydantic import Field
 
 
 class Like(BaseModel):
     user_id: int
-from fastapi.encoders import jsonable_encoder
-from pydantic import BaseModel, Field
+
 
 
 class UserBase(BaseModel):
@@ -33,6 +34,14 @@ class UserInfo(BaseModel):
     user: User
 
 
+class Author(BaseModel):
+    id: int
+    name: str
+
+    class Config:
+        orm_mode = True
+
+
 class TweetBase(BaseModel):
     tweet_data: str
 
@@ -48,7 +57,7 @@ class TweetUpdate(TweetBase):
 class Tweet(TweetBase):
     id: int
     likes: list = []
-    author: User
+    author: Author
     attachments: list = Field([], alias='images')
 
     tweet_data: str
@@ -57,9 +66,19 @@ class Tweet(TweetBase):
         orm_mode = True
 
 
-class Author(BaseModel):
+class Media(BaseModel):
+    image: str
+
+    class Config:
+        orm_mode = True
+
+
+class TweetSerilize(BaseModel):
     id: int
-    name: str
+    content: str = Field(..., alias='tweet_data')
+    attachments: list[Media]
+    author: Author
+    likes: list = []
 
     class Config:
         orm_mode = True
@@ -68,7 +87,7 @@ class Author(BaseModel):
 class TweetResponse(BaseModel):
     id: int
     content: str = Field(..., alias='tweet_data')
-    attachments: list = []
+    attachments: list[Media]
     author: Author
     likes: list = []
 
@@ -91,14 +110,6 @@ class TweetSuccess(BaseModel):
 
 class Success(BaseModel):
     result: bool = True
-
-
-def to_json(data: dict):
-    print(data)
-    result = jsonable_encoder(data)
-    for item in result['tweets']:
-        item['content'] = item.pop('tweet_data')
-    return result
 
 
 class MediaCreate(BaseModel):
