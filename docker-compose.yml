@@ -1,0 +1,71 @@
+version: "3.9"
+
+services:
+  web_app:
+    container_name: app_main
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      CONFIG_FILE: ".env"
+    entrypoint:
+      sh -c "
+      alembic upgrade head &&
+      uvicorn src.main:app --host 0.0.0.0 --reload
+      "
+    volumes:
+      - .:/code
+    ports:
+      - "${APP_PORT}:8000"
+    depends_on:
+      web_db:
+        condition: service_healthy
+#      web_redis:
+#        condition: service_healthy
+    networks:
+      - web_net
+
+  web_db:
+    container_name: db_main
+    image: postgres:15.1-alpine
+    expose:
+      - 5432
+    ports:
+      - "${DB_PORT}:5432"
+    volumes:
+      - ./data/db:/var/lib/postgresql/data
+      - ./init-database.sh:/docker-entrypoint-initdb.d/init-database.sh
+    environment:
+      CONFIG_FILE: ".env"
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    networks:
+      - web_net
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -d ${DB_NAME} -U ${DB_USER}"]
+      interval: 10s
+      timeout: 10s
+      retries: 30
+
+#  web_redis:
+#    container_name: main_redis
+#    image: redis:latest
+#    entrypoint:
+#      sh -c "redis-server"
+#    expose:
+#      - 6380
+#    ports:
+#      - "${REDIS_PORT}:6380"
+#    environment:
+#      CONFIG_FILE: ".env.main"
+#    networks:
+#      - web_net
+#    healthcheck:
+#        test: [ "CMD", "redis-cli","ping" ]
+#        interval: 10s
+#        timeout: 10s
+#        retries: 30
+
+networks:
+  web_net:
+    name: web_net
