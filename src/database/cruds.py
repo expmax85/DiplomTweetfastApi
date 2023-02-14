@@ -1,77 +1,108 @@
+from abc import abstractmethod
+from typing import TypeAlias, Union
+
+from fastapi import Depends
 from fastapi.encoders import jsonable_encoder
-from pydantic import BaseModel
-from pydantic.schema import Generic, TypeVar
+from sqlalchemy import select
+from sqlalchemy.engine import Row
 from sqlalchemy.orm import Session
 
-from src.models import Base, Tweet, User
-from src.models import schemas
-from src.models.models import Like
-from src.models.models import Media
+from src.database.database import get_db
+from src.models import schemas, Tweet, User
+from src.models.models import Like, Token, Media
 
-ModelType = TypeVar("ModelType", bound=Base)
-CreateSchemaType = TypeVar("CreateSchemaType", bound=BaseModel)
-UpdateSchemaType = TypeVar("UpdateSchemaType", bound=BaseModel)
+ModelType: TypeAlias = Union[Tweet, User]
+CreateSchema: TypeAlias = Union[schemas.TweetCreate, schemas.UserCreate]
+UpdateSchema: TypeAlias = Union[schemas.UserUpdate, schemas.TweetUpdate]
 
 
-class BaseCRUD(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
-    model = None
+class BaseAction:
+    @abstractmethod
+    def __init__(self, model: type[ModelType], session: Session):
+        self.model = model
+        self.session = session
 
-    def __init__(self, *args, **kwargs):
-        if not self.model:
-            raise AttributeError('Need to define model')
-
-    def create(self, db: Session, obj_in: CreateSchemaType, **kwargs) -> ModelType:
+    def create(self, obj_in: CreateSchema, **kwargs) -> ModelType:
         obj_in_data = jsonable_encoder(obj_in)
         db_obj = self.model(**obj_in_data, **kwargs)
-        db.add(db_obj)
-        db.commit()
-        db.refresh(db_obj)
+        self.session.add(db_obj)
         return db_obj
 
-    def remove(self, db: Session, id_obj: int) -> bool:
-        obj = db.query(self.model).get(id_obj)
-        db.delete(obj)
-        db.commit()
+    def update(self, id_obj: int, obj_data: UpdateSchema) -> ModelType | None:
+        if updated_obj := self.get(id_obj=id_obj):
+            for key, value in obj_data.dict(exclude_unset=True).items():
+                setattr(updated_obj, key, value)
+            self.session.add(updated_obj)
+        return updated_obj
+
+    def remove(self, id_obj: int) -> bool:
+        if result := self.get(id_obj=id_obj):
+            self.session.delete(result)
         return True
 
-    def update(self, db: Session, id_obj: int, obj_data: UpdateSchemaType) -> int:
-        updated = db.query(self.model).filter(self.model.id == id_obj).update(obj_data.dict(exclude_unset=True))
-        db.commit()
-        return updated
+    def get_all(self, skip: int = 0, limit: int = 100) -> list[Row]:
+        result = self.session.scalars(
+            select(self.model).offset(skip).limit(limit).all()
+        ).all()
+        return result
 
-    def get_all(self, db: Session, skip: int = 0, limit: int = 100) -> list[tuple]:
-        return db.query(self.model).offset(skip).limit(limit).all()
+    def get(self, id_obj: int) -> ModelType | None:
+        result = self.session.execute(
+            select(self.model).filter(self.model.id == id_obj)
+        )
+        return result.scalars().first()
 
-    def get(self, db: Session, id_obj: int) -> ModelType | None:
-        return db.query(self.model).filter(self.model.id == id_obj).first()
+    def serialize(self, obj: ModelType | Row) -> dict:
+        return jsonable_encoder(obj)
 
 
-class TweetAction(BaseCRUD[Tweet, schemas.TweetCreate, schemas.TweetUpdate]):
-    model = Tweet
+class TweetAction(BaseAction):
 
-    def create_like(self, db: Session, user_id: int, tweet_id: int) -> None:
+    def __init__(self, session):
+        self.model = Tweet
+        self.session = session
+
+    def create_like(self, user_id: int, tweet_id: int) -> None:
         like = Like(tweet_id=tweet_id, user_id=user_id)
-        db.add(like)
-        db.commit()
+        self.session.add(like)
 
-    def remove_like(self, db: Session, user_id: int, tweet_id: int) -> None:
-        like = db.query(Like).filter(Like.user_id == user_id,
-                                     Like.tweet_id == tweet_id).first()
-        db.delete(like)
-        db.commit()
+    def remove_like(self, user_id: int, tweet_id: int) -> None:
+        like = self.session.scalars(select(Like).where(Like.user_id == user_id,
+                                     Like.tweet_id == tweet_id)).first()
+        self.session.delete(like)
 
 
-class UserAction(BaseCRUD[User, schemas.UserCreate, schemas.UserUpdate]):
-    model = User
+class UserAction(BaseAction):
+
+    def __init__(self, session):
+        self.model = User
+        self.session = session
+
+    def get_user_by_api_key(self, api_key: str) -> User:
+        q = select(User).join(Token, Token.user_id == User.id).where(Token.api_key == api_key)
+        result = self.session.scalars(q).first()
+        # user = result.scalars().first()
+        return result
+
+    def add_follow(self, user, user_id):
+        # followed_user = await self.get(id_obj=user_id)
+        followed_user = self.session.scalars(
+            select(self.model).filter(self.model.id == user_id)
+        ).first()
+        user.follow(followed_user)
+        self.session.add(user)
 
 
-def create_image(db: Session, file: str, tweet_id) -> Media:
-    db_obj = Media(image=file, tweet_media_ids=1)
-    db.add(db_obj)
-    db.commit()
-    db.refresh(db_obj)
+def create_image(file: str, session: Session = Depends(get_db)) -> Media:
+    db_obj = Media(image=file)
+    session.add(db_obj)
     return db_obj
 
 
-tweets_orm = TweetAction()
-users_orm = UserAction()
+def get_tweet_service(session: Session = Depends(get_db)):
+    return TweetAction(session=session)
+
+
+def get_user_service(session: Session = Depends(get_db)):
+    return UserAction(session=session)
+# users_orm = UserAction()

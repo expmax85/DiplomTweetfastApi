@@ -1,2 +1,2 @@
-from .database import engine, session
+from .database import engine
 

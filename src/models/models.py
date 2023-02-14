@@ -1,11 +1,12 @@
-from sqlalchemy import Column, Integer, String, Text, ForeignKey, Table
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import relationship, backref
+from sqlalchemy import Column, Integer, String, ForeignKey, Table
+from sqlalchemy.orm import relationship, backref, DeclarativeBase, Mapped, mapped_column
 
 from src.database import engine
 from src.database.database import SessionLocal
 
-Base = declarative_base(bind=engine)
+
+class Base(DeclarativeBase):
+    pass
 
 
 class Tweet(Base):
@@ -17,17 +18,16 @@ class Tweet(Base):
     """
     __tablename__ = 'tweets'
 
-    id = Column(Integer, primary_key=True)
-    tweet_data = Column('content', String(100), nullable=False)
-    user_id = Column(Integer, ForeignKey('users.id'))
+    id: Mapped[int] = mapped_column(primary_key=True)
+    tweet_data: Mapped[str] = mapped_column(String(200))
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
 
-    author = relationship('User', back_populates='tweets')
-    attachments = relationship('Media', back_populates='tweet')
-    likes = relationship('Like', back_populates='tweet')
+    author: Mapped["User"] = relationship(back_populates='tweets')
+    attachments: Mapped[list["Media"]] = relationship(back_populates='tweet')
+    likes: Mapped[list["Like"]] = relationship(back_populates='tweet')
 
     def is_author(self, user: 'User') -> bool:
         return self.user_id == user.id
-
 
 
 class Media(Base):
@@ -37,11 +37,11 @@ class Media(Base):
     """
     __tablename__ = 'tweet_media'
 
-    id = Column(Integer, primary_key=True)
-    image = Column(String, default='some')
-    tweet_media_ids = Column(ForeignKey('tweets.id', ondelete='cascade'))
+    id: Mapped[int] = mapped_column(primary_key=True)
+    image: Mapped[str] = mapped_column(String(20))
+    tweet_id: Mapped[int] = mapped_column(ForeignKey("tweets.id"))
 
-    tweet = relationship('Tweet', back_populates='attachments')
+    tweet: Mapped["Tweet"] = relationship(back_populates='attachments')
 
 
 followers = Table(
@@ -61,17 +61,17 @@ class User(Base):
     """
     __tablename__ = 'users'
 
-    id = Column(Integer, primary_key=True)
-    name = Column(String(15), nullable=False)
+    id: Mapped[int] = mapped_column(primary_key=True)
+    name: Mapped[str] = mapped_column(String(20))
 
-    likes = relationship('Like', back_populates='user_likes', lazy=True)
-    tweets = relationship('Tweet', back_populates='author')
-    token = relationship('Token', backref='user')
-    followed = relationship('User', secondary=followers,
-                            primaryjoin=(followers.c.follower_id == id),
-                            secondaryjoin=(followers.c.followed_id == id),
-                            backref=backref('followers', lazy='dynamic'),
-                            lazy='dynamic')
+    likes: Mapped[list["Like"]] = relationship(back_populates='user_likes', lazy=True)
+    tweets: Mapped[list["Tweet"]] = relationship(back_populates='author')
+    token: Mapped["Token"] = relationship(backref='user')
+    followed: Mapped[list["User"]] = relationship(secondary=followers,
+                                            primaryjoin=(followers.c.follower_id == id),
+                                            secondaryjoin=(followers.c.followed_id == id),
+                                            backref=backref('followers', lazy='dynamic'),
+                                            lazy='dynamic')
 
     def follow(self, user: 'User') -> 'User':
         if not self.is_following(user):
@@ -97,18 +97,19 @@ class Token(Base):
     """
     __tablename__ = 'tokens'
 
-    id = Column(Integer, primary_key=True)
-    user_id = Column(ForeignKey('users.id', ondelete='cascade'))
-    api_key = Column(String(50), nullable=False)
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
+    api_key: Mapped[str] = mapped_column(String(50))
 
 
 class Like(Base):
     __tablename__ = "likes"
-    user_id = Column(ForeignKey("users.id"), primary_key=True)
-    tweet_id = Column(ForeignKey("tweets.id"), primary_key=True)
 
-    tweet = relationship("Tweet", back_populates="likes")
-    user_likes = relationship("User", back_populates="likes")
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), primary_key=True)
+    tweet_id: Mapped[int] = mapped_column(ForeignKey("tweets.id"), primary_key=True)
+
+    tweet: Mapped[list["Tweet"]] = relationship(back_populates="likes")
+    user_likes: Mapped[list["User"]] = relationship(back_populates="likes")
 
 
 def init_db():
@@ -123,9 +124,9 @@ def create_users():
             User(name='Mike'),
             User(name='Lily')
         ]
-        users[0].token.append(Token(api_key='test'))
-        users[1].token.append(Token(api_key='mike_secret_token'))
-        users[2].token.append(Token(api_key='lily_secret_token'))
+        users[0].token = Token(api_key='test')
+        users[1].token = Token(api_key='mike_secret_token')
+        users[2].token = Token(api_key='lily_secret_token')
         session.add_all(users)
         session.commit()
         session.close()
