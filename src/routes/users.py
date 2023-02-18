@@ -1,12 +1,9 @@
 from fastapi import APIRouter, Depends
-from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
 from starlette.requests import Request
 from starlette.responses import JSONResponse
 
 from src.database import UserAction, get_user_service
-from src.database import get_db
-from src.models import schemas, User, Token
+from src.models import schemas, User
 
 router = APIRouter()
 
@@ -19,8 +16,6 @@ async def get_user(request: Request, user_service: UserAction = Depends(get_user
 @router.post("/users/{user_id}/follow", response_model=schemas.Success)
 async def add_follow(user_id: int, user_service: UserAction = Depends(get_user_service),
                      user: User = Depends(get_user)):
-    # followed_user = await user_service.get(id_obj=user_id)
-    # user.follow(followed_user)
     await user_service.add_follow(user, user_id)
     return {"result": True}
 
@@ -28,8 +23,7 @@ async def add_follow(user_id: int, user_service: UserAction = Depends(get_user_s
 @router.delete("/users/{user_id}/follow", response_model=schemas.Success)
 async def remove_follow(user_id: int, user_service: UserAction = Depends(get_user_service),
                         user: User = Depends(get_user)):
-    followed_user = await user_service.get(id_obj=user_id)
-    user.unfollow(followed_user)
+    await user_service.unfollow(user, user_id)
     return {"result": True}
 
 

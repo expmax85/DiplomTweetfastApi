@@ -20,7 +20,6 @@ app_api.include_router(users.router)
 
 @app.on_event("startup")
 async def startup_event():
-    print('here')
     await create_users()
 
 

@@ -7,7 +7,6 @@ class Like(BaseModel):
     user_id: int
 
 
-
 class UserBase(BaseModel):
     name: str
 

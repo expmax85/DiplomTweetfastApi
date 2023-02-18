@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Text, ForeignKey, Table
+from sqlalchemy import Column, Integer, String, ForeignKey, Table
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship, backref
 
@@ -17,7 +17,7 @@ class Tweet(Base):
 
     id = Column('id', Integer, primary_key=True)
     tweet_data = Column('content', String(100), nullable=False)
-    user_id = Column('user_id', ForeignKey('users.id'))
+    user_id = Column('user_id', ForeignKey('users.id', ondelete='cascade'))
 
     author = relationship('User', back_populates='tweets')
     attachments = relationship('Media', back_populates='tweet')
@@ -67,24 +67,26 @@ class User(Base):
     followed = relationship('User', secondary=followers,
                             primaryjoin=(followers.c.follower_id == id),
                             secondaryjoin=(followers.c.followed_id == id),
-                            backref=backref('followers', lazy='dynamic'),
-                            lazy='dynamic')
+                            backref=backref('followers'))
 
     def follow(self, user: 'User') -> 'User':
-        # if not self.is_following(user):
         self.followed.append(user)
         return self
 
     def unfollow(self, user: 'User') -> 'User':
-        if self.is_following(user):
-            self.followed.remove(user)
-            return self
-
-    def is_following(self, user: 'User') -> bool:
-        return self.followed.filter(followers.c.followed_id == user.id).count() > 0
+        self.followed.remove(user)
+        return self
 
     def to_dict(self) -> dict:
         return {'id': self.id, 'name': self.name}
+
+    def __repr__(self) -> str:
+        return str(self.name)
+
+    # def __eq__(self, other) -> bool:
+    #     if not isinstance(other, User):
+    #         return False
+    #     return other.id == self.id
 
 
 class Token(Base):
@@ -103,8 +105,8 @@ class Token(Base):
 
 class Like(Base):
     __tablename__ = "likes"
-    user_id = Column('user_id', ForeignKey("users.id"), primary_key=True)
-    tweet_id = Column('tweet_id', ForeignKey("tweets.id"), primary_key=True)
+    user_id = Column('user_id', ForeignKey("users.id", ondelete='cascade'), primary_key=True)
+    tweet_id = Column('tweet_id', ForeignKey("tweets.id", ondelete='cascade'), primary_key=True)
 
     tweet = relationship("Tweet", back_populates="likes")
     user_likes = relationship("User", back_populates="likes")
