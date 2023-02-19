@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, ForeignKey, Table
+from sqlalchemy import Column, Integer, String, ForeignKey, Table, ARRAY
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship, backref
 
@@ -17,6 +17,7 @@ class Tweet(Base):
 
     id = Column('id', Integer, primary_key=True)
     tweet_data = Column('content', String(100), nullable=False)
+    tweet_media_ids = Column('tweet_media_ids', ARRAY(Integer), nullable=True)
     user_id = Column('user_id', ForeignKey('users.id', ondelete='cascade'))
 
     author = relationship('User', back_populates='tweets')

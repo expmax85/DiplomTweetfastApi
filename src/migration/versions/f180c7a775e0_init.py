@@ -40,6 +40,7 @@ def upgrade() -> None:
     sa.Column('id', sa.Integer(), nullable=False),
     sa.Column('content', sa.String(length=100), nullable=False),
     sa.Column('user_id', sa.Integer(), nullable=False),
+    sa.Column('tweet_media_ids', sa.ARRAY(sa.Integer()), nullable=True),
     sa.ForeignKeyConstraint(['user_id'], ['users.id'], ),
     sa.PrimaryKeyConstraint('id')
     )

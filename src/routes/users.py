@@ -27,7 +27,7 @@ async def remove_follow(user_id: int, user_service: UserAction = Depends(get_use
     return {"result": True}
 
 
-@router.get("/users/me")
+@router.get("/users/me", response_model=schemas.UserInfo)
 async def get_self_info(user: User = Depends(get_user)):
     if not user:
         return JSONResponse({"result": False, "error_type": "Unauthorized", "error_message": "User has no registered"},
@@ -38,7 +38,7 @@ async def get_self_info(user: User = Depends(get_user)):
                         status_code=200)
 
 
-@router.get("/users/{user_id}")
+@router.get("/users/{user_id}", response_model=schemas.UserInfo)
 async def get_user_info(user_id: int, user_service: UserAction = Depends(get_user_service)):
     user = await user_service.get(id_obj=user_id)
     return JSONResponse({"result": True, "user": {"id": user.id, "name": user.name,

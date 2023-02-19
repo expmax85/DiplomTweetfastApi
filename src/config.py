@@ -39,7 +39,8 @@ class Settings(BaseSettings):
         f"@{Database.DB_HOST}/{Database.DB_NAME}"
     )
     STATIC_DIR = os.path.join(str(BASE_DIR), 'static')
-    UPLOADS_DIR = os.path.join(str(STATIC_DIR), 'images')
+    UPLOADS_DIR = os.path.join('static', 'images')
 
 
 settings = Settings()
+

@@ -1,10 +1,5 @@
-from fastapi.encoders import jsonable_encoder
 from pydantic import BaseModel
 from pydantic import Field
-
-
-class Like(BaseModel):
-    user_id: int
 
 
 class UserBase(BaseModel):
@@ -46,7 +41,7 @@ class TweetBase(BaseModel):
 
 
 class TweetCreate(TweetBase):
-    pass
+    tweet_media_ids: list[int] = Field(None)
 
 
 class TweetUpdate(TweetBase):
@@ -58,7 +53,6 @@ class Tweet(TweetBase):
     likes: list = []
     author: Author
     attachments: list = Field([], alias='images')
-
     tweet_data: str
 
     class Config:
@@ -72,20 +66,9 @@ class Media(BaseModel):
         orm_mode = True
 
 
-class TweetSerilize(BaseModel):
-    id: int
-    content: str = Field(..., alias='tweet_data')
-    attachments: list[Media]
-    author: Author
-    likes: list = []
-
-    class Config:
-        orm_mode = True
-
-
 class TweetResponse(BaseModel):
     id: int
-    content: str = Field(..., alias='tweet_data')
+    tweet_data: str
     attachments: list[Media]
     author: Author
     likes: list = []
@@ -94,8 +77,7 @@ class TweetResponse(BaseModel):
         orm_mode = True
 
 
-class Tweets(BaseModel):
-    result: bool = True
+class TweetsSerialize(BaseModel):
     tweets: list[TweetResponse]
 
     class Config:
@@ -112,4 +94,5 @@ class Success(BaseModel):
 
 
 class MediaCreate(BaseModel):
-    file: str
+    result: bool
+    media_id: int
