@@ -15,7 +15,7 @@ from abc import abstractmethod, ABC
 from fastapi.encoders import jsonable_encoder
 from sqlalchemy import select, delete, update
 
-from src.database.database import AbstractAsyncSession, get_db
+from src.database.database import AbstractAsyncSession, get_db, SQLSession
 
 
 class AbstractAction(ABC):
@@ -137,7 +137,7 @@ class UserAction(AbstractAction):
 
     def _stmt_get(self):
         return select(self.model).options(selectinload(self.model.followed),
-                                          selectinload(self.model.followers),
+                                          selectinload(self.model.followers_),
                                           selectinload(self.model.likes),
                                           selectinload(self.model.tweets),
                                           selectinload(self.model.likes))
@@ -156,6 +156,13 @@ class UserAction(AbstractAction):
 
     async def get_user_by_api_key(self, api_key: str) -> User:
         stmt = self._stmt_get().join(Token, Token.user_id == User.id).where(Token.api_key == api_key)
+        async with self.db as db:
+            result = await db.session.execute(stmt)
+        user = result.scalars().first()
+        return user
+
+    async def get_by_name(self, name: str):
+        stmt = self._stmt_get().where(self.model.name == name)
         async with self.db as db:
             result = await db.session.execute(stmt)
         user = result.scalars().first()

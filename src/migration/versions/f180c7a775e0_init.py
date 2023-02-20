@@ -21,6 +21,8 @@ def upgrade() -> None:
     op.create_table('users',
     sa.Column('id', sa.Integer(), nullable=False),
     sa.Column('name', sa.String(length=15), nullable=False),
+    sa.Column('hashed_password', sa.String(length=100), nullable=True),
+    sa.Column('inactive', sa.Boolean, default=False),
     sa.PrimaryKeyConstraint('id')
     )
     op.create_table('followers',

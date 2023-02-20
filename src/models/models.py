@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, ForeignKey, Table, ARRAY
+from sqlalchemy import Column, Integer, String, ForeignKey, Table, ARRAY, Boolean
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship, backref
 
@@ -42,7 +42,7 @@ class Media(Base):
     tweet = relationship('Tweet', back_populates='attachments')
 
 
-followers = Table(
+Followers = Table(
     'followers', Base.metadata,
     Column('follower_id', Integer, ForeignKey('users.id')),
     Column('followed_id', Integer, ForeignKey('users.id'))
@@ -61,14 +61,16 @@ class User(Base):
 
     id = Column('id', Integer, primary_key=True)
     name = Column('name', String(15), nullable=False)
+    hashed_password = Column('hashed_password', String(100), nullable=False)
+    inactive = Column('inactive', Boolean, default=False)
 
     likes = relationship('Like', back_populates='user_likes', lazy=True)
     tweets = relationship('Tweet', back_populates='author')
     token = relationship('Token', back_populates='user')
-    followed = relationship('User', secondary=followers,
-                            primaryjoin=(followers.c.follower_id == id),
-                            secondaryjoin=(followers.c.followed_id == id),
-                            backref=backref('followers'))
+    followed = relationship('User', secondary=Followers,
+                            primaryjoin=(Followers.c.follower_id == id),
+                            secondaryjoin=(Followers.c.followed_id == id),
+                            backref=backref('followers_', lazy='subquery'))
 
     def follow(self, user: 'User') -> 'User':
         self.followed.append(user)
