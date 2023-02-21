@@ -28,7 +28,7 @@ async def get_self_info(user: User = Depends(get_current_active_user)):
         return JSONResponse({"result": False, "error_type": "Unauthorized", "error_message": "User has no registered"},
                             status_code=403)
     return JSONResponse({"result": True, "user": {"id": user.id, "name": user.name,
-                                                  "followers": [usr.to_dict() for usr in user.followers_],
+                                                  "followers": [usr.to_dict() for usr in user.followers],
                                                   "following": [usr.to_dict() for usr in user.followed]}},
                         status_code=200)
 
@@ -37,6 +37,6 @@ async def get_self_info(user: User = Depends(get_current_active_user)):
 async def get_user_info(user_id: int, user_service: UserAction = Depends(get_user_service)):
     user = await user_service.get(id_obj=user_id)
     return JSONResponse({"result": True, "user": {"id": user.id, "name": user.name,
-                                                  "followers": [usr.to_dict() for usr in user.followers_],
+                                                  "followers": [usr.to_dict() for usr in user.followers],
                                                   "following": [usr.to_dict() for usr in user.followed]}},
                         status_code=200)

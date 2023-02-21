@@ -1,6 +1,4 @@
-from sqlalchemy import select
-
-from src.database import engine, UserAction
+from src.database import UserAction
 from src.database.database import SQLSession
 from src.models import User, Token
 from src.models.utils import get_password_hash
@@ -12,7 +10,6 @@ async def create_users():
     async with async_session as db:
         user_orm = UserAction(db=db)
         users = await user_orm.get_all()
-        print(users)
         if len(users) < 1:
             users = [
                 User(name='John', hashed_password=get_password_hash('123456')),
@@ -23,4 +20,3 @@ async def create_users():
             users[1].token.append(Token(api_key='mike_token'))
             users[2].token.append(Token(api_key='lily_token'))
             db.session.add_all(users)
-

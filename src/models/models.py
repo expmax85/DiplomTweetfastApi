@@ -42,11 +42,11 @@ class Media(Base):
     tweet = relationship('Tweet', back_populates='attachments')
 
 
-Followers = Table(
-    'followers', Base.metadata,
-    Column('follower_id', Integer, ForeignKey('users.id')),
-    Column('followed_id', Integer, ForeignKey('users.id'))
-)
+class Follower(Base):
+    __tablename__ = 'followers'
+
+    follower_id = Column(Integer, ForeignKey('users.id'), primary_key=True)
+    followed_id = Column(Integer, ForeignKey('users.id'), primary_key=True)
 
 
 class User(Base):
@@ -67,10 +67,8 @@ class User(Base):
     likes = relationship('Like', back_populates='user_likes', lazy=True)
     tweets = relationship('Tweet', back_populates='author')
     token = relationship('Token', back_populates='user')
-    followed = relationship('User', secondary=Followers,
-                            primaryjoin=(Followers.c.follower_id == id),
-                            secondaryjoin=(Followers.c.followed_id == id),
-                            backref=backref('followers_', lazy='subquery'))
+    followers = relationship('Follower', primaryjoin="Follower.follower_id == User.id")
+    followed = relationship('Follower', primaryjoin="Follower.followed_id == User.id")
 
     def follow(self, user: 'User') -> 'User':
         self.followed.append(user)
@@ -85,11 +83,6 @@ class User(Base):
 
     def __repr__(self) -> str:
         return str(self.name)
-
-    # def __eq__(self, other) -> bool:
-    #     if not isinstance(other, User):
-    #         return False
-    #     return other.id == self.id
 
 
 class Token(Base):

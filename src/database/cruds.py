@@ -137,7 +137,7 @@ class UserAction(AbstractAction):
 
     def _stmt_get(self):
         return select(self.model).options(selectinload(self.model.followed),
-                                          selectinload(self.model.followers_),
+                                          selectinload(self.model.followers),
                                           selectinload(self.model.likes),
                                           selectinload(self.model.tweets),
                                           selectinload(self.model.likes))

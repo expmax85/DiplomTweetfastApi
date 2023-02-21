@@ -26,10 +26,8 @@ def upgrade() -> None:
     sa.PrimaryKeyConstraint('id')
     )
     op.create_table('followers',
-    sa.Column('follower_id', sa.Integer(), nullable=True),
-    sa.Column('followed_id', sa.Integer(), nullable=True),
-    sa.ForeignKeyConstraint(['followed_id'], ['users.id'], ),
-    sa.ForeignKeyConstraint(['follower_id'], ['users.id'], )
+    sa.Column('follower_id', sa.Integer(), sa.ForeignKey('users.id'), primary_key=True),
+    sa.Column('followed_id', sa.Integer(), sa.ForeignKey('users.id'), primary_key=True),
     )
     op.create_table('tokens',
     sa.Column('id', sa.Integer(), nullable=False),
