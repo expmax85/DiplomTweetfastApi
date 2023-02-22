@@ -1,7 +1,6 @@
-from src.database import UserAction
-from src.database.database import SQLSession
 from src.models import User, Token
 from src.models.utils import get_password_hash
+from . import SQLSession, UserAction
 
 async_session = SQLSession()
 

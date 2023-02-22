@@ -3,12 +3,14 @@ from typing import Union
 
 from fastapi import Depends, HTTPException, status, APIRouter
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
+from fastapi.security.utils import get_authorization_scheme_param
 from jose import JWTError, jwt
 from starlette.requests import Request
 
-from src.database import UserAction, get_db
-from src.models import User, schemas
 from src.config import settings
+from src.database import UserAction, get_db
+from src.exceptions import UnAuthorizedError, InactiveUserError
+from src.models import User, schemas
 from src.models.utils import verify_password
 
 
@@ -19,10 +21,15 @@ class CustomAuth2(OAuth2PasswordBearer):
         scheme = 'api-key'
         if api_key:
             return api_key, scheme
-        return await super(CustomAuth2, self).__call__(request)
+        authorization = request.headers.get("Authorization")
+        scheme, param = get_authorization_scheme_param(authorization)
+        if not authorization or scheme.lower() != "bearer":
+            raise UnAuthorizedError()
+        else:
+            return param
 
 
-oauth2_scheme = CustomAuth2(tokenUrl="token")
+oauth2_scheme = CustomAuth2(tokenUrl="token", auto_error=False)
 
 
 async def authenticate_user(username: str, password: str):
@@ -34,12 +41,14 @@ async def authenticate_user(username: str, password: str):
     return user
 
 
-async def get_user(username: str):
+async def get_user(username: str = None, api_key: str = None) -> User:
     user_service = UserAction(db=get_db())
+    if api_key:
+        return await user_service.get_user_by_api_key(api_key=api_key)
     return await user_service.get_by_name(name=username)
 
 
-def create_access_token(data: dict, expires_delta: timedelta | None = None):
+def create_access_token(data: dict, expires_delta: timedelta | None = None) -> str:
     to_encode = data.copy()
     if expires_delta:
         expire = datetime.utcnow() + expires_delta
@@ -50,10 +59,9 @@ def create_access_token(data: dict, expires_delta: timedelta | None = None):
     return encoded_jwt
 
 
-async def get_current_user(token: str = Depends(oauth2_scheme)):
-    user_service = UserAction(db=get_db())
+async def get_current_user(token: str = Depends(oauth2_scheme)) -> User | None:
     if 'api-key' in token:
-        return await user_service.get_user_by_api_key(api_key=token[0])
+        return await get_user(api_key=token[0])
 
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
@@ -74,16 +82,18 @@ async def get_current_user(token: str = Depends(oauth2_scheme)):
     return user
 
 
-async def get_current_active_user(current_user: User = Depends(get_current_user)):
-    if current_user.inactive:
-        raise HTTPException(status_code=400, detail="Inactive user")
+async def get_current_active_user(current_user: User = Depends(get_current_user)) -> User:
+    if not current_user:
+        raise UnAuthorizedError
+    elif current_user.inactive:
+        raise InactiveUserError
     return current_user
 
 
-router = APIRouter()
+router = APIRouter(tags=['Auth'])
 
 
-@router.post("/token", response_model=schemas.Token)
+@router.post("/token", response_model=schemas.Token, include_in_schema=False)
 async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends()):
     user = await authenticate_user(form_data.username, form_data.password)
     if not user:

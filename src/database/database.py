@@ -1,27 +1,19 @@
-from abc import ABC, abstractmethod
-
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.ext.declarative import declarative_base
 
 from src.config import settings
+from .abstracts import AbstractAsyncSession
+
+
+__all__ = (
+    'SQLSession',
+    'engine',
+    'get_db'
+)
 
 engine = create_async_engine(settings.DATABASE_URL)
 async_session = AsyncSession(bind=engine, expire_on_commit=False)
 Base = declarative_base()
-
-
-class AbstractAsyncSession(ABC):
-    @abstractmethod
-    def __init__(self, session: AsyncSession):
-        self.session = session
-
-    @abstractmethod
-    async def __aenter__(self):
-        raise NotImplementedError
-
-    @abstractmethod
-    async def __aexit__(self, exc_type, exc_value, traceback):
-        raise NotImplementedError
 
 
 class SQLSession(AbstractAsyncSession):
@@ -46,5 +38,5 @@ class SQLSession(AbstractAsyncSession):
         await self.session.rollback()
 
 
-def get_db() -> AbstractAsyncSession:
+def get_db() -> SQLSession:
     return SQLSession()

@@ -1,90 +1,69 @@
 import os
 import uuid
+from typing import Sequence
 
 import aiofiles
 from fastapi import Depends, File
+from fastapi.encoders import jsonable_encoder
 from sqlalchemy.orm import selectinload
+from sqlalchemy import select, delete, update, Row
 
 from src.config import settings
-from src.models import schemas
-from src.models.models import Tweet, User, Token
-from src.models.models import Like
-from src.models.models import Media
-from abc import abstractmethod, ABC
-
-from fastapi.encoders import jsonable_encoder
-from sqlalchemy import select, delete, update
-
-from src.database.database import AbstractAsyncSession, get_db, SQLSession
+from src.models import schemas, Tweet, User, Token, Like, Media
+from .abstracts import AbstractAction
+from .database import get_db, SQLSession
 
 
-class AbstractAction(ABC):
-    @abstractmethod
-    def __init__(self, *args, **kwargs):
-        raise NotImplementedError
-
-    @abstractmethod
-    def create(self, *args, **kwargs):
-        raise NotImplementedError
-
-    @abstractmethod
-    def update(self, *args, **kwargs):
-        raise NotImplementedError
-
-    @abstractmethod
-    def remove(self, *args, **kwargs):
-        raise NotImplementedError
-
-    @abstractmethod
-    def get_all(self, *args, **kwargs):
-        raise NotImplementedError
-
-    @abstractmethod
-    def get(self, *args, **kwargs):
-        raise NotImplementedError
+__all__ = (
+    'get_user_action',
+    'get_tweet_action',
+    'get_media_action',
+    'TweetAction',
+    'UserAction',
+    'MediaAction',
+)
 
 
 class TweetAction(AbstractAction):
 
-    def __init__(self, db: AbstractAsyncSession):
+    def __init__(self, db: SQLSession) -> None:
         self.model = Tweet
         self.db = db
 
-    async def create(self, obj_in: schemas.TweetCreate, **kwargs) -> Tweet:
+    async def create(self, data: dict, **kwargs) -> Tweet:
         async with self.db as db:
-            obj_in_data = jsonable_encoder(obj_in)
-            db_obj = self.model(**obj_in_data, **kwargs)
+            db_obj = self.model(**data, **kwargs)
             db.session.add(db_obj)
         return db_obj
 
-    async def update(self, id_obj: int, obj_data: schemas.TweetUpdate) -> Tweet | None:
-        if updated_obj := await self.get(id_obj=id_obj):
+    async def update(self, tweet_id: int, data: schemas.TweetUpdate) -> Tweet | None:
+        if updated_obj := await self.get(tweet_id=tweet_id):
             async with self.db as db:
-                for key, value in obj_data.dict(exclude_unset=True).items():
+                for key, value in data.dict(exclude_unset=True).items():
                     setattr(updated_obj, key, value)
                 db.session.add(updated_obj)
         return updated_obj
 
-    async def remove(self, id_obj: int) -> bool:
-        if result := await self.get(id_obj=id_obj):
-            stmt = delete(Like).where(Like.tweet_id == id_obj)
+    async def remove(self, tweet_id: int) -> bool:
+        if result := await self.get(tweet_id=tweet_id):
+            stmt = delete(Like).where(Like.tweet_id == tweet_id)
             async with self.db as db:
                 await db.session.execute(stmt)
                 await db.session.delete(result)
         return True
 
-    def _stmt_get(self):
+    def _stmt_get(self) -> 'select':
         return select(self.model).options(selectinload(self.model.attachments),
                                           selectinload(self.model.author),
                                           selectinload(self.model.likes))
 
-    async def get(self, id_obj: int) -> Tweet | None:
-        stmt = self._stmt_get().where(self.model.id == id_obj)
+    async def get(self, tweet_id: int) -> Tweet | None:
+        stmt = self._stmt_get().where(self.model.id == tweet_id)
         async with self.db as db:
             result = await db.session.execute(stmt)
         return result.scalars().first()
 
-    async def get_all(self, skip: int = 0, limit: int = 100) -> list[Tweet]:
+    async def get_all(self, skip: int = 0, limit: int = 100) -> Sequence[Row]:
         stmt = self._stmt_get().offset(skip).limit(limit)
         async with self.db as db:
             result = await db.session.execute(stmt)
@@ -105,31 +84,36 @@ class TweetAction(AbstractAction):
             like = query.scalars().first()
             await db.session.delete(like)
 
+    async def check_like(self, user_id: int, tweet_id: int) -> bool:
+        stmt = select(Like).where(Like.user_id == user_id, Like.tweet_id == tweet_id)
+        async with self.db as db:
+            result = await db.session.execute(stmt)
+        return bool(result.scalars().all())
+
 
 class UserAction(AbstractAction):
 
-    def __init__(self, db: AbstractAsyncSession):
+    def __init__(self, db: SQLSession):
         self.model = User
         self.db = db
 
-    async def create(self, obj_in: schemas.UserCreate, **kwargs) -> User:
+    async def create(self, data: schemas.UserCreate, **kwargs) -> User:
         async with self.db as db:
-            obj_in_data = jsonable_encoder(obj_in)
+            obj_in_data = jsonable_encoder(data)
             db_obj = self.model(**obj_in_data, **kwargs)
             db.session.add(db_obj)
         return db_obj
 
-    async def update(self, id_obj: int, obj_data: schemas.UserUpdate) -> User | None:
-        if updated_obj := await self.get(id_obj=id_obj):
+    async def update(self, user_id: int, obj_data: schemas.UserUpdate) -> User | None:
+        if updated_obj := await self.get(user_id=user_id):
             async with self.db as db:
                 for key, value in obj_data.dict(exclude_unset=True).items():
                     setattr(updated_obj, key, value)
                 db.session.add(updated_obj)
         return updated_obj
 
-    async def remove(self, id_obj: int) -> bool:
-        if result := await self.get(id_obj=id_obj):
-
+    async def remove(self, user_id: int) -> bool:
+        if result := await self.get(user_id=user_id):
             async with self.db as db:
                 await db.session.delete(result)
                 await db.session.commit()
@@ -142,13 +126,13 @@ class UserAction(AbstractAction):
                                           selectinload(self.model.tweets),
                                           selectinload(self.model.likes))
 
-    async def get(self, id_obj: int) -> User | None:
-        stmt = self._stmt_get().where(self.model.id == id_obj)
+    async def get(self, user_id: int) -> User | None:
+        stmt = self._stmt_get().where(self.model.id == user_id)
         async with self.db as db:
             result = await db.session.execute(stmt)
         return result.scalars().first()
 
-    async def get_all(self, skip: int = 0, limit: int = 100) -> list[User]:
+    async def get_all(self, skip: int = 0, limit: int = 100) -> Sequence[Row]:
         stmt = self._stmt_get().offset(skip).limit(limit)
         async with self.db as db:
             result = await db.session.execute(stmt)
@@ -161,34 +145,33 @@ class UserAction(AbstractAction):
         user = result.scalars().first()
         return user
 
-    async def get_by_name(self, name: str):
+    async def get_by_name(self, name: str) -> User:
         stmt = self._stmt_get().where(self.model.name == name)
         async with self.db as db:
             result = await db.session.execute(stmt)
         user = result.scalars().first()
         return user
 
-    async def add_follow(self, user: User, user_id) -> None:
+    async def add_follow(self, user: User, followed_id) -> None:
+        stmt = select(self.model).filter(self.model.id == followed_id)
         async with self.db as db:
-            followed_user = await db.session.execute(
-                select(self.model).filter(self.model.id == user_id)
-            )
-            user.follow(followed_user.scalars().first())
+            result = await db.session.execute(stmt)
+            followed_user = result.scalars().first()
+            user.follow(followed_user)
             db.session.add(user)
+            await db.session.commit()
 
-    async def unfollow(self, user: User, user_id: int) -> None:
-        stmt = self._stmt_get().where(self.model.id == user_id)
+    async def unfollow(self, user: User, unfollowed_id: int) -> None:
+        stmt = self._stmt_get().where(self.model.id == unfollowed_id)
         async with self.db as db:
-            result = await db.session.execute(
-                stmt
-            )
+            result = await db.session.execute(stmt)
             followed_user = result.scalars().first()
             user.unfollow(followed_user)
 
 
 class MediaAction(AbstractAction):
 
-    def __init__(self, db: AbstractAsyncSession):
+    def __init__(self, db: SQLSession):
         self.model = Media
         self.db = db
 
@@ -213,31 +196,32 @@ class MediaAction(AbstractAction):
 
     async def remove(self, tweet: Tweet) -> None:
         stmt = delete(self.model).where(self.model.id.in_(tweet.tweet_media_ids))
-        del_list = await self.get(tweet=tweet)
+        del_list = await self.get(media_ids=tweet.tweet_media_ids)
         for path in del_list:
-            os.remove(path)
+            os.remove(str(path))
         async with self.db as db:
             await db.session.execute(stmt)
 
-    async def get(self, tweet: Tweet) -> list[str]:
-        stmt = select(self.model.image).where(self.model.id.in_(tweet.tweet_media_ids))
+    async def get(self, media_ids: list) -> Sequence[Row]:
+        stmt = select(Media.id).where(Media.id.in_(media_ids))
         async with self.db as db:
             result = await db.session.execute(stmt)
         return result.scalars().all()
 
-    async def get_all(self) -> None:
+    async def get_all(self) -> Sequence[Row]:
         async with self.db as db:
             result = await db.session.execute(select(self.model))
         return result.scalars().all()
 
 
-def get_tweet_service(db: AbstractAsyncSession = Depends(get_db)):
-    return TweetAction(db=db)
-
-
-def get_user_service(db: AbstractAsyncSession = Depends(get_db)):
+def get_user_action(db: SQLSession = Depends(get_db)):
     return UserAction(db=db)
 
 
-def get_media_service(db: AbstractAsyncSession = Depends(get_db)):
+def get_media_action(db: SQLSession = Depends(get_db)):
     return MediaAction(db=db)
+
+
+def get_tweet_action(db: SQLSession = Depends(get_db)):
+    return TweetAction(db=db)
+
