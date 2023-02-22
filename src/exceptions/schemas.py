@@ -75,6 +75,28 @@ class CreateTweetError(ErrorBase):
         }
 
 
+class SizeImgError(ErrorBase):
+    class Config:
+        schema_extra = {
+            "example": {
+                "result": False,
+                "error_type": "UploadImageError",
+                "error_message": "File too big",
+            }
+        }
+
+
+class FileNotImgError(ErrorBase):
+    class Config:
+        schema_extra = {
+            "example": {
+                "result": False,
+                "error_type": "UploadImageError",
+                "error_message": "Wrong format file",
+            }
+        }
+
+
 def get_response_scheme(model: Type[BaseModel], description: str = None):
     if not description:
         description = model.__name__

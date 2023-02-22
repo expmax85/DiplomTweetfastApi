@@ -1,11 +1,15 @@
+import os
+import uuid
+
 from fastapi import File, Depends
 from fastapi.encoders import jsonable_encoder
 
 from src.config import settings
 from src.database import TweetAction, MediaAction, get_tweet_action, get_media_action
-from src.exceptions import NotAllowedError, CreateTweetError, TweetNotExist
+from src.exceptions import NotAllowedError, CreateTweetError, TweetNotExist, WrongFileError, SizeFileError
 from src.models import schemas, User
 from .base_service import Service
+from src.celery.celery_app import load_image, remove_imgs
 
 
 class TweetService(Service):
@@ -25,7 +29,16 @@ class TweetService(Service):
         return schemas.TweetSuccess(tweet_id=tweet.id).dict()
 
     async def add_media(self, file: File) -> dict:
-        image = await self.media_action.create(file=file)
+        ftype = file.filename.split('.')[-1]
+        if ftype not in settings.App.ALLOWED_FILES:
+            raise WrongFileError
+        elif file.size > settings.MAX_SIZE:
+            raise SizeFileError
+        filename = ".".join([str(uuid.uuid4()), ftype])
+        path = os.path.join(settings.UPLOADS_DIR, filename)
+        load_image.delay(data=file.file.read(), filename=path)
+        # write_to_disk(file.file.read(), path)
+        image = await self.media_action.create(path=path)
         return schemas.MediaSuccess(media_id=image.id).dict()
 
     async def remove(self, tweet_id: int, user: 'User'):
@@ -34,8 +47,11 @@ class TweetService(Service):
             raise TweetNotExist
         elif not tweet.is_author(user):
             raise NotAllowedError
-        await self.media_action.remove(tweet=tweet)
+        del_list = (item.image for item in tweet.attachments)
+        await self.media_action.remove(media_ids=tweet.tweet_media_ids)
         await self.action.remove(tweet_id=tweet_id)
+        remove_imgs.delay(data=del_list)
+        # await remove_files(del_list=del_list)
         return self.success_response
 
     async def create_like(self, tweet_id: int, user_id: int) -> dict:

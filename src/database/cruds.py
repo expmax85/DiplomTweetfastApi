@@ -175,15 +175,7 @@ class MediaAction(AbstractAction):
         self.model = Media
         self.db = db
 
-    async def _write_to_disk(self, content: bytes, file_path: str) -> None:
-        async with aiofiles.open(file_path, mode='wb') as f:
-            await f.write(content)
-
-    async def create(self, file: File) -> Media:
-        ftype = file.filename.split('.')[-1]
-        filename = ".".join([str(uuid.uuid4()), ftype])
-        path = os.path.join(settings.UPLOADS_DIR, filename)
-        await self._write_to_disk(file.file.read(), path)
+    async def create(self, path: str) -> Media:
         async with self.db as db:
             image = self.model(image=path)
             db.session.add(image)
@@ -194,11 +186,8 @@ class MediaAction(AbstractAction):
         async with self.db as db:
             await db.session.execute(stmt)
 
-    async def remove(self, tweet: Tweet) -> None:
-        stmt = delete(self.model).where(self.model.id.in_(tweet.tweet_media_ids))
-        del_list = await self.get(media_ids=tweet.tweet_media_ids)
-        for path in del_list:
-            os.remove(str(path))
+    async def remove(self, media_ids: list) -> None:
+        stmt = delete(self.model).where(self.model.id.in_(media_ids))
         async with self.db as db:
             await db.session.execute(stmt)
 

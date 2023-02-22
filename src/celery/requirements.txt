@@ -1,0 +1,2 @@
+aiofiles==23.1.0
+celery~=5.2.7

@@ -6,6 +6,8 @@ __all__ = (
     'TweetNotExist',
     'NotAllowedError',
     'InactiveUserError',
+    'SizeFileError',
+    'WrongFileError',
 )
 
 
@@ -51,3 +53,16 @@ class InactiveUserError(BaseCustomExc):
     status_code = 403
     error_type = 'InactiveUserError'
     error_message = 'This user is inactive. Please write to administration'
+
+
+class UploadImgError(BaseCustomExc):
+    status_code = 400
+    error_type = 'UploadImageError'
+
+
+class SizeFileError(UploadImgError):
+    error_message = 'File too big'
+
+
+class WrongFileError(UploadImgError):
+    error_message = 'Wrong format file'

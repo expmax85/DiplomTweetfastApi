@@ -22,7 +22,8 @@ async def create_tweet(new_tweet: schemas.TweetCreate,
 
 
 @router.post("/medias", response_model=schemas.MediaSuccess, status_code=status.HTTP_201_CREATED,
-             dependencies=[Depends(get_current_active_user)])
+             dependencies=[Depends(get_current_active_user)],
+             responses={400: get_response_scheme(model=exc_schemes.SizeImgError)})
 async def add_media(file: UploadFile = File(...), tweet_service: TweetService = Depends(get_tweet_service)):
     """ Uploading tweet images.
 
