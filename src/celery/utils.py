@@ -9,4 +9,7 @@ async def write_to_disk(content: bytes, file_path: str) -> None:
 
 async def remove_files_from_disk(del_list: list) -> None:
     for path in del_list:
-        os.remove(str(path))
+        try:
+            os.remove(str(path))
+        except FileNotFoundError:
+            pass

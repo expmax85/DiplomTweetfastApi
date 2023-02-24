@@ -5,13 +5,13 @@ services:
     container_name: app_main
     build:
       context: .
-      dockerfile: Dockerfile_dev
+      dockerfile: Dockerfile
     environment:
-      CONFIG_FILE: ".env"
+      CONFIG_FILE: "test.env"
     entrypoint:
       sh -c "
       alembic upgrade head &&
-      uvicorn src.main:app --reload
+      PYTHONASYNCIODEBUG=1 pytest
       "
     volumes:
       - .:/code
@@ -25,22 +25,6 @@ services:
     networks:
       - web_net
 
-  celery:
-    build:
-      context: .
-      dockerfile: Dockerfile_celery
-    command: celery -A src.celery.celery_app worker --loglevel=info
-    environment:
-      CONFIG_FILE: ".env"
-    networks:
-      - web_net
-    volumes:
-      - .:/code
-    depends_on:
-      - web_app
-      - web_rabbitmq
-      - web_redis
-
   web_db:
     container_name: db_main
     image: postgres:15.1-alpine
@@ -52,7 +36,7 @@ services:
       - ./data/db:/var/lib/postgresql/data
       - ./init-database.sh:/docker-entrypoint-initdb.d/init-database.sh
     environment:
-      CONFIG_FILE: ".env"
+      CONFIG_FILE: "test.env.test"
       POSTGRES_USER: ${DB_USER}
       POSTGRES_PASSWORD: ${DB_PASSWORD}
     networks:
@@ -73,29 +57,11 @@ services:
     ports:
       - "${REDIS_PORT}:6380"
     environment:
-      CONFIG_FILE: ".env"
+      CONFIG_FILE: "test.env.test"
     networks:
       - web_net
     healthcheck:
         test: [ "CMD", "redis-cli", "ping" ]
-        interval: 10s
-        timeout: 10s
-        retries: 30
-
-  web_rabbitmq:
-    container_name: main_rabbitmq
-    image: rabbitmq:3.11.8-alpine
-    restart: always
-    expose:
-      - 5672
-    ports:
-      - "${RABBIT_PORT}:5672"
-    environment:
-      CONFIG_FILE: ".env"
-    networks:
-      - web_net
-    healthcheck:
-        test: rabbitmq-diagnostics -q ping
         interval: 10s
         timeout: 10s
         retries: 30

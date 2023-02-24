@@ -24,6 +24,8 @@ class App(BaseSettings):
     MAX_IMG_SIZE_MB: int = 3
     CACHE_TWEET_PREFIX: str = 'tweets'
     CACHE_USER_PREFIX: str = 'users'
+    ORIGINS: list[str] = []
+
     class Config:
         env_file = env_path
 

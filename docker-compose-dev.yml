@@ -2,16 +2,16 @@ version: "3.9"
 
 services:
   web_app:
-    container_name: app_main
+    container_name: app_dev
     build:
       context: .
-      dockerfile: Dockerfile
+      dockerfile: Dockerfile_dev
     environment:
-      CONFIG_FILE: ".env.test"
+      CONFIG_FILE: "dev.env"
     entrypoint:
       sh -c "
       alembic upgrade head &&
-      PYTHONASYNCIODEBUG=1 pytest
+      uvicorn src.main:app --host 0.0.0.0 --reload
       "
     volumes:
       - .:/code
@@ -25,6 +25,22 @@ services:
     networks:
       - web_net
 
+  celery:
+    build:
+      context: .
+      dockerfile: Dockerfile_celery
+    command: celery -A src.celery.celery_app worker --loglevel=info
+    environment:
+      CONFIG_FILE: "dev.env"
+    networks:
+      - web_net
+    volumes:
+      - .:/code
+    depends_on:
+      - web_app
+      - web_rabbitmq
+      - web_redis
+
   web_db:
     container_name: db_main
     image: postgres:15.1-alpine
@@ -34,9 +50,9 @@ services:
       - "${DB_PORT}:5432"
     volumes:
       - ./data/db:/var/lib/postgresql/data
-      - ./init-database.sh:/docker-entrypoint-initdb.d/init-database.sh
+      - ./postgres/init-database.sh:/docker-entrypoint-initdb.d/init-database.sh
     environment:
-      CONFIG_FILE: ".env.test"
+      CONFIG_FILE: "dev.env"
       POSTGRES_USER: ${DB_USER}
       POSTGRES_PASSWORD: ${DB_PASSWORD}
     networks:
@@ -57,11 +73,29 @@ services:
     ports:
       - "${REDIS_PORT}:6380"
     environment:
-      CONFIG_FILE: ".env.test"
+      CONFIG_FILE: "dev.env"
     networks:
       - web_net
     healthcheck:
         test: [ "CMD", "redis-cli", "ping" ]
+        interval: 10s
+        timeout: 10s
+        retries: 30
+
+  web_rabbitmq:
+    container_name: main_rabbitmq
+    image: rabbitmq:3.11.8-alpine
+    restart: always
+    expose:
+      - 5672
+    ports:
+      - "${RABBIT_PORT}:5672"
+    environment:
+      CONFIG_FILE: "dev.env"
+    networks:
+      - web_net
+    healthcheck:
+        test: rabbitmq-diagnostics -q ping
         interval: 10s
         timeout: 10s
         retries: 30
