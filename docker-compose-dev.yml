@@ -100,6 +100,19 @@ services:
         timeout: 10s
         retries: 30
 
+  flower:
+    image: mher/flower:latest
+    environment:
+      CELERY_BROKER_URL: amqp://guest:guest@web_rabbitmq:5672//
+      FLOWER_PORT: 5555
+      FLOWER_BASIC_AUTH: "flower:flower"
+    ports:
+      - "5555:5555"
+    depends_on:
+      - celery
+    networks:
+      - web_net
+
 networks:
   web_net:
     name: web_net
