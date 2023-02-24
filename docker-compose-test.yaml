@@ -7,16 +7,16 @@ services:
       context: .
       dockerfile: Dockerfile
     environment:
-      CONFIG_FILE: ".env"
+      CONFIG_FILE: ".env.test"
     entrypoint:
       sh -c "
       alembic upgrade head &&
-      gunicorn src.main:app -k uvicorn.workers.UvicornWorker --bind 0.0.0.0:80 --forwarded-allow-ips='*'
+      PYTHONASYNCIODEBUG=1 pytest
       "
     volumes:
       - .:/code
     ports:
-      - "${APP_PORT}:80"
+      - "${APP_PORT}:8000"
     depends_on:
       web_db:
         condition: service_healthy
@@ -24,22 +24,6 @@ services:
         condition: service_healthy
     networks:
       - web_net
-
-  celery:
-    build:
-      context: .
-      dockerfile: Dockerfile_celery
-    command: celery -A src.celery.celery_app worker --loglevel=info
-    environment:
-      CONFIG_FILE: ".env"
-    networks:
-      - web_net
-    volumes:
-      - .:/code
-    depends_on:
-      - web_app
-      - web_rabbitmq
-      - web_redis
 
   web_db:
     container_name: db_main
@@ -52,7 +36,7 @@ services:
       - ./data/db:/var/lib/postgresql/data
       - ./init-database.sh:/docker-entrypoint-initdb.d/init-database.sh
     environment:
-      CONFIG_FILE: ".env"
+      CONFIG_FILE: ".env.test"
       POSTGRES_USER: ${DB_USER}
       POSTGRES_PASSWORD: ${DB_PASSWORD}
     networks:
@@ -73,7 +57,7 @@ services:
     ports:
       - "${REDIS_PORT}:6380"
     environment:
-      CONFIG_FILE: ".env"
+      CONFIG_FILE: ".env.test"
     networks:
       - web_net
     healthcheck:
@@ -81,35 +65,6 @@ services:
         interval: 10s
         timeout: 10s
         retries: 30
-
-  web_rabbitmq:
-    container_name: main_rabbitmq
-    image: rabbitmq:3.11.8-alpine
-    restart: always
-    expose:
-      - 5672
-    ports:
-      - "${RABBIT_PORT}:5672"
-    environment:
-      CONFIG_FILE: ".env"
-    networks:
-      - web_net
-    healthcheck:
-        test: rabbitmq-diagnostics -q ping
-        interval: 10s
-        timeout: 10s
-        retries: 30
-
-#  nginx:
-#    image: nginx:alpine
-#    depends_on:
-#      - web_app
-#    ports:
-#      - "80:80"
-#    volumes:
-#      - ./conf.d:/etc/nginx/conf.d
-#    networks:
-#      - web_net
 
 networks:
   web_net:

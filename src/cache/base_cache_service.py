@@ -1,24 +1,23 @@
 from abc import ABC, abstractmethod
 
 
-class Service(ABC):
-
+class AbstractCache(ABC):
     @abstractmethod
-    def create(self, *args, **kwargs):
+    def __init__(self, *args, **kwargs):
         raise NotImplementedError
 
     @abstractmethod
-    def update(self, *args, **kwargs):
+    async def get_cache(self, *args, **kwargs):
         raise NotImplementedError
 
     @abstractmethod
-    def remove(self, *args, **kwargs):
+    async def set_cache(self, *args, **kwargs):
         raise NotImplementedError
 
     @abstractmethod
-    def get_all(self, *args, **kwargs):
+    async def delete_cache(self, *args, **kwargs):
         raise NotImplementedError
 
     @abstractmethod
-    def get(self, *args, **kwargs):
+    async def delete_many(self, *args, **kwargs):
         raise NotImplementedError

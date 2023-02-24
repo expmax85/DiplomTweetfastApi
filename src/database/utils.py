@@ -11,11 +11,11 @@ async def create_users():
         users = await user_orm.get_all()
         if len(users) < 1:
             users = [
-                User(name='John', hashed_password=get_password_hash('123456')),
-                User(name='Mike', hashed_password=get_password_hash('234567')),
-                User(name='Lily', hashed_password=get_password_hash('345678'))
+                User(name='John', hashed_password=get_password_hash('123456'),
+                     token=Token(api_key='test')),
+                User(name='Mike', hashed_password=get_password_hash('234567'),
+                     token=Token(api_key='mike_token')),
+                User(name='Lily', hashed_password=get_password_hash('345678'),
+                     token=Token(api_key='lily_token'))
             ]
-            users[0].token.append(Token(api_key='test'))
-            users[1].token.append(Token(api_key='mike_token'))
-            users[2].token.append(Token(api_key='lily_token'))
             db.session.add_all(users)

@@ -5,18 +5,18 @@ services:
     container_name: app_main
     build:
       context: .
-      dockerfile: Dockerfile
+      dockerfile: Dockerfile_dev
     environment:
       CONFIG_FILE: ".env"
     entrypoint:
       sh -c "
       alembic upgrade head &&
-      gunicorn src.main:app -k uvicorn.workers.UvicornWorker --bind 0.0.0.0:80 --forwarded-allow-ips='*'
+      uvicorn src.main:app --reload
       "
     volumes:
       - .:/code
     ports:
-      - "${APP_PORT}:80"
+      - "${APP_PORT}:8000"
     depends_on:
       web_db:
         condition: service_healthy
@@ -99,17 +99,6 @@ services:
         interval: 10s
         timeout: 10s
         retries: 30
-
-#  nginx:
-#    image: nginx:alpine
-#    depends_on:
-#      - web_app
-#    ports:
-#      - "80:80"
-#    volumes:
-#      - ./conf.d:/etc/nginx/conf.d
-#    networks:
-#      - web_net
 
 networks:
   web_net:

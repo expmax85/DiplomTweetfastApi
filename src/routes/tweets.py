@@ -17,7 +17,7 @@ async def create_tweet(new_tweet: schemas.TweetCreate,
     """ Create new tweet.
 
      - **tweet** - data creating tweet in json format with keys 'tweet_data' - tweet test message,
-     'tweet_media_ids; - not required, media_ids list for tweet images. """
+     'tweet_media_ids' - not required, media_ids list for tweet images. """
     return await tweet_service.create(data=new_tweet, user_id=user.id)
 
 
@@ -31,7 +31,7 @@ async def add_media(file: UploadFile = File(...), tweet_service: TweetService = 
     return await tweet_service.add_media(file=file)
 
 
-@router.delete("/tweets/{tweet_id}", response_model=schemas.Success, status_code=status.HTTP_201_CREATED,
+@router.delete("/tweets/{tweet_id}", response_model=schemas.Success, status_code=status.HTTP_202_ACCEPTED,
                responses={404: get_response_scheme(model=exc_schemes.TweetNotExist),
                           403: get_response_scheme(model=exc_schemes.NotAllowedError)})
 async def remove_tweet(tweet_id: int,
@@ -73,3 +73,10 @@ async def get_tweets(skip: int = 0, limit: int = 100,
                      tweet_service: TweetService = Depends(get_tweet_service)):
     """ Get all tweets. Authenticate is not required """
     return await tweet_service.get_all(skip=skip, limit=limit)
+
+
+@public_router.get("/tweets/{tweet_id}", response_model=schemas.TweetResponse)
+async def get_tweets(tweet_id: int,
+                     tweet_service: TweetService = Depends(get_tweet_service)):
+    """ Get tweet. Authenticate is not required """
+    return await tweet_service.get(tweet_id=tweet_id)

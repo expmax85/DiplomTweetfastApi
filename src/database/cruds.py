@@ -45,11 +45,14 @@ class TweetAction(AbstractAction):
         return updated_obj
 
     async def remove(self, tweet_id: int) -> bool:
-        if result := await self.get(tweet_id=tweet_id):
-            stmt = delete(Like).where(Like.tweet_id == tweet_id)
-            async with self.db as db:
-                await db.session.execute(stmt)
-                await db.session.delete(result)
+        stmt = delete(self.model).options(selectinload(self.model.attachments),
+                                          selectinload(self.model.author),
+                                          selectinload(self.model.likes))\
+            .where(self.model.id == tweet_id)
+        stmt_like = delete(Like).where(Like.tweet_id == tweet_id)
+        async with self.db as db:
+            await db.session.execute(stmt_like)
+            await db.session.execute(stmt)
         return True
 
     def _stmt_get(self) -> 'select':

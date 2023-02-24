@@ -13,7 +13,6 @@ __all__ = (
 
 engine = create_async_engine(settings.DATABASE_URL)
 async_session = AsyncSession(bind=engine, expire_on_commit=False)
-Base = declarative_base()
 
 
 class SQLSession(AbstractAsyncSession):

@@ -5,8 +5,9 @@ ENV PYTHONUNBUFFERED 1
 
 WORKDIR /code
 
-COPY ./requirements.txt /code/
+COPY ./src/celery/requirements.txt /code/
 
 RUN pip install --upgrade pip && pip install -r requirements.txt --no-cache-dir
 
-COPY . /code
+COPY ./src/celery/ /code/src/celery/
+COPY ./src/config.py /code/src/

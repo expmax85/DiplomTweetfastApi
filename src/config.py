@@ -22,7 +22,8 @@ class App(BaseSettings):
     CREATE_TEST_USERS: bool = True
     ALLOWED_FILES: list[str] = ['png', 'jpg', 'jpeg']
     MAX_IMG_SIZE_MB: int = 3
-
+    CACHE_TWEET_PREFIX: str = 'tweets'
+    CACHE_USER_PREFIX: str = 'users'
     class Config:
         env_file = env_path
 
@@ -66,8 +67,8 @@ class Settings(BaseSettings):
         f"postgresql+asyncpg://{Database.DB_USER}:{Database.DB_PASSWORD}"
         f"@{Database.DB_HOST}/{Database.DB_NAME}"
     )
+    CACHE_URL: str = f"redis://{Redis.REDIS_HOST}"
     CELERY_BROKER_URL: str = f"amqp://{RabbitMQ.RABBIT_USER}:{RabbitMQ.RABBIT_PASSWORD}@{RabbitMQ.RABBIT_HOST}/"
-    CELERY_BACKEND_URL: str = f"rpc://{Redis.REDIS_HOST}"
 
     STATIC_DIR = os.path.join(str(BASE_DIR), 'static')
     UPLOADS_DIR = os.path.join('static', 'images')

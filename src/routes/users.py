@@ -1,12 +1,12 @@
 from fastapi import APIRouter, Depends
 from starlette import status
-from starlette.responses import JSONResponse
 
 from src.services import UserService, get_user_service
 from src.models import schemas, User
 from src.exceptions import schemas as exc_schemes
 from src.exceptions import get_response_scheme
 from src.routes.tokens import get_current_active_user
+from src.services.utils import serialize_user
 
 router = APIRouter(tags=['Users'], responses={401: get_response_scheme(model=exc_schemes.Unauthorized),
                                               403: get_response_scheme(model=exc_schemes.InActiveUserError)})
@@ -34,13 +34,10 @@ async def remove_follow(user_id: int, user_service: UserService = Depends(get_us
     return await user_service.remove_follow(user=user, unfollowed_id=user_id)
 
 
-@router.get("/users/me", response_model=schemas.UserInfo)
+@router.get("/users/me", response_model=schemas.UserInfo, dependencies=[Depends(get_user_service)])
 async def get_self_info(user: User = Depends(get_current_active_user)):
     """ Get userinfo about self."""
-    return JSONResponse({"result": True, "user": {"id": user.id, "name": user.name,
-                                                  "followers": [usr.to_dict() for usr in user.followers],
-                                                  "following": [usr.to_dict() for usr in user.followed]}},
-                        status_code=200)
+    return serialize_user(user)
 
 
 @router.get("/users/{user_id}", response_model=schemas.UserInfo,
@@ -51,3 +48,9 @@ async def get_user_info(user_id: int, user_service: UserService = Depends(get_us
 
      - ***user_id*** - id by user"""
     return await user_service.get(user_id=user_id)
+
+
+@router.get("/users", response_model=list[schemas.UserInfo], dependencies=[Depends(get_current_active_user)])
+async def get_all_users(skip: int = 0, limit: int = 100, user_service: UserService = Depends(get_user_service)):
+    """ Get list with all users """
+    return await user_service.get_all(skip=skip, limit=limit)

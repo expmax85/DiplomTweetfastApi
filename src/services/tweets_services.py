@@ -1,3 +1,4 @@
+import base64
 import os
 import uuid
 
@@ -8,16 +9,21 @@ from src.config import settings
 from src.database import TweetAction, MediaAction, get_tweet_action, get_media_action
 from src.exceptions import NotAllowedError, CreateTweetError, TweetNotExist, WrongFileError, SizeFileError
 from src.models import schemas, User
+from src.celery.celery_app import load_file, remove_files
+from src.cache import RedisCache, get_cache
 from .base_service import Service
-from src.celery.celery_app import load_image, remove_imgs
+from .utils import key_gen, _to_json
 
 
 class TweetService(Service):
 
-    def __init__(self, main_action: TweetAction, media_action: MediaAction) -> None:
+    def __init__(self, main_action: TweetAction, media_action: MediaAction,
+                 cache: RedisCache, cache_key_prefix: str) -> None:
         self.action = main_action
         self.media_action = media_action
         self.success_response = schemas.Success().dict()
+        self.cache = cache
+        self.cache_key_prefix = cache_key_prefix
 
     async def create(self, data: schemas.TweetCreate, user_id: int) -> dict:
         obj_in_data = jsonable_encoder(data)
@@ -25,21 +31,35 @@ class TweetService(Service):
             if not await self._check_exist_media(obj_in_data.get('tweet_media_ids')):
                 raise CreateTweetError
         tweet = await self.action.create(data=obj_in_data, user_id=user_id)
-        await self.media_action.update(tweet=tweet)
+        if data.tweet_media_ids:
+            await self.media_action.update(tweet=tweet)
+        await self.cache.set_cache(data=jsonable_encoder(tweet),
+                                   key=key_gen(self.cache_key_prefix, tweet.id))
         return schemas.TweetSuccess(tweet_id=tweet.id).dict()
 
-    async def add_media(self, file: File) -> dict:
-        ftype = file.filename.split('.')[-1]
-        if ftype not in settings.App.ALLOWED_FILES:
-            raise WrongFileError
-        elif file.size > settings.MAX_SIZE:
-            raise SizeFileError
-        filename = ".".join([str(uuid.uuid4()), ftype])
-        path = os.path.join(settings.UPLOADS_DIR, filename)
-        load_image.delay(data=file.file.read(), filename=path)
-        # write_to_disk(file.file.read(), path)
-        image = await self.media_action.create(path=path)
-        return schemas.MediaSuccess(media_id=image.id).dict()
+    async def get_all(self, skip: int, limit: int) -> dict:
+        result = await self.cache.get_cache(
+            key=key_gen(self.cache_key_prefix)
+        )
+        if not result:
+            tweets = await self.action.get_all(skip=skip, limit=limit)
+            tweets = schemas.TweetsSerialize(tweets=tweets)
+            result = _to_json(tweets.dict())
+            await self.cache.set_cache(data=result, key=key_gen(self.cache_key_prefix))
+        return jsonable_encoder(result)
+
+    async def get(self, tweet_id: int) -> dict:
+        result = await self.cache.get_cache(key=key_gen(self.cache_key_prefix, tweet_id))
+        if not result:
+            result = await self.action.get(tweet_id=tweet_id)
+            await self.cache.set_cache(data=jsonable_encoder(result),
+                                       key=key_gen(self.cache_key_prefix, tweet_id))
+        return result
+
+    async def update(self, tweet_id: int, data: schemas.TweetUpdate) -> dict:
+        updated_tweet = await self.action.update(tweet_id=tweet_id, data=data)
+        await self.cache.delete_cache(key=key_gen(self.cache_key_prefix, tweet_id))
+        return updated_tweet
 
     async def remove(self, tweet_id: int, user: 'User'):
         tweet = await self.action.get(tweet_id=tweet_id)
@@ -47,37 +67,29 @@ class TweetService(Service):
             raise TweetNotExist
         elif not tweet.is_author(user):
             raise NotAllowedError
-        del_list = (item.image for item in tweet.attachments)
-        await self.media_action.remove(media_ids=tweet.tweet_media_ids)
+        if tweet.attachments and len(tweet.attachments):
+            del_list = [item.image for item in tweet.attachments]
+            await self.media_action.remove(media_ids=tweet.tweet_media_ids)
+            remove_files.delay(data=del_list)
         await self.action.remove(tweet_id=tweet_id)
-        remove_imgs.delay(data=del_list)
-        # await remove_files(del_list=del_list)
+        await self.cache.delete_cache(key=key_gen(self.cache_key_prefix))
+        await self.cache.delete_cache(key=key_gen(self.cache_key_prefix, tweet_id))
         return self.success_response
 
-    async def create_like(self, tweet_id: int, user_id: int) -> dict:
-        await self.action.create_like(tweet_id=tweet_id, user_id=user_id)
-        if not await self.action.check_like(user_id=user_id, tweet_id=tweet_id):
-            raise TweetNotExist
-        return self.success_response
+    async def add_media(self, file: File) -> dict:
+        f_type = file.filename.split('.')[-1]
+        if f_type not in settings.App.ALLOWED_FILES:
+            raise WrongFileError
+        elif file.size > settings.MAX_SIZE:
+            raise SizeFileError
+        filename = ".".join([str(uuid.uuid4()), f_type])
+        path = os.path.join(settings.UPLOADS_DIR, filename)
+        image = await self.media_action.create(path=path)
 
-    async def remove_like(self, tweet_id: int, user_id: int) -> dict:
-        if not await self.action.check_like(user_id=user_id, tweet_id=tweet_id):
-            raise TweetNotExist
-        await self.action.remove_like(tweet_id=tweet_id, user_id=user_id)
-        return self.success_response
-
-    async def get_all(self, skip: int, limit: int) -> dict:
-        tweets = await self.action.get_all(skip=skip, limit=limit)
-        tweets = schemas.TweetsSerialize(tweets=tweets)
-        return self._to_json(tweets.dict())
-
-    async def get(self, tweet_id: int):
-        pass
-
-    def _to_json(self, data: dict) -> dict:
-        for item in data['tweets']:
-            item['attachments'] = [i['image'] for i in item['attachments']]
-        return data
+        content = await file.read()
+        encoded_contents = base64.b64encode(content).decode("utf-8")
+        load_file.delay(data=encoded_contents, filename=path)
+        return schemas.MediaSuccess(media_id=image.id).dict()
 
     async def _check_exist_media(self, media_ids: list[int]) -> bool:
         if len(media_ids) > settings.App.COUNT_IMAGES:
@@ -85,7 +97,25 @@ class TweetService(Service):
         medias = await self.media_action.get(media_ids=media_ids)
         return len(medias) == len(media_ids)
 
+    async def create_like(self, tweet_id: int, user_id: int) -> dict:
+        await self.action.create_like(tweet_id=tweet_id, user_id=user_id)
+        if not await self.action.check_like(user_id=user_id, tweet_id=tweet_id):
+            raise TweetNotExist
+        await self.cache.delete_cache(key=key_gen(self.cache_key_prefix))
+        await self.cache.delete_cache(key=key_gen(self.cache_key_prefix, tweet_id))
+        return self.success_response
+
+    async def remove_like(self, tweet_id: int, user_id: int) -> dict:
+        if not await self.action.check_like(user_id=user_id, tweet_id=tweet_id):
+            raise TweetNotExist
+        await self.action.remove_like(tweet_id=tweet_id, user_id=user_id)
+        await self.cache.delete_cache(key=key_gen(self.cache_key_prefix))
+        await self.cache.delete_cache(key=key_gen(self.cache_key_prefix, tweet_id))
+        return self.success_response
+
 
 def get_tweet_service(action: TweetAction = Depends(get_tweet_action),
-                      media_action: MediaAction = Depends(get_media_action)) -> TweetService:
-    return TweetService(main_action=action, media_action=media_action)
+                      media_action: MediaAction = Depends(get_media_action),
+                      cache: RedisCache = Depends(get_cache)) -> TweetService:
+    return TweetService(main_action=action, media_action=media_action,
+                        cache=cache, cache_key_prefix=settings.App.CACHE_TWEET_PREFIX)
