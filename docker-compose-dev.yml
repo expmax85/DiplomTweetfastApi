@@ -110,6 +110,7 @@ services:
       - "${FLOWER_PORT}:5555"
     depends_on:
       - celery
+      - web_rabbitmq
     networks:
       - web_net
 
