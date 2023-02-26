@@ -1,16 +1,11 @@
-from pydantic import BaseModel
-from pydantic import Field
+from pydantic import BaseModel, Field
 
 
 class Success(BaseModel):
     result: bool = True
 
     class Config:
-        schema_extra = {
-            "example": {
-                "result": True
-            }
-        }
+        schema_extra = {"example": {"result": True}}
 
 
 class UserBase(BaseModel):
@@ -28,7 +23,7 @@ class UserUpdate(UserBase):
 class User(UserBase):
     id: int
     followers: list = []
-    following: list = Field([], alias='followed')
+    following: list = Field([], alias="followed")
 
     class Config:
         orm_mode = True
@@ -46,7 +41,7 @@ class UserInfo(Success):
                     "name": "John",
                     "followers": [],
                     "following": [],
-                }
+                },
             }
         }
 
@@ -97,7 +92,7 @@ class Media(BaseModel):
 
 class Tweet(BaseModel):
     id: int
-    content: str = Field(..., alias='tweet_data')
+    content: str = Field(..., alias="tweet_data")
     attachments: list[Media]
     author: Author
     likes: list = []
@@ -113,23 +108,21 @@ class TweetsSerialize(BaseModel):
         orm_mode = True
 
 
-class TweetResponse(Tweet):
+class TweetResponse(BaseModel):
+    id: int
     content: str
     attachments: list[str]
     author: dict
+    likes: list = []
 
     class Config:
-        orm_mode = False
         schema_extra = {
             "example": {
                 "id": 1,
                 "content": "Test tweet",
                 "attachments": [],
-                "author": {
-                    "id": 1,
-                    "name": "John"
-                },
-                "likes": []
+                "author": {"id": 1, "name": "John"},
+                "likes": [],
             }
         }
 

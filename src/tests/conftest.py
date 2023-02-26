@@ -5,15 +5,15 @@ import pytest
 import pytest_asyncio
 from fastapi import Depends
 from httpx import AsyncClient
-from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
+from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 
 from src.api import app_api
 from src.cache import get_cache
 from src.cache.base_cache_service import AbstractCache
 from src.config import settings
-from src.database import get_db, SQLSession, UserAction
+from src.database import SQLSession, UserAction, get_db
 from src.exceptions import UnAuthorizedError
-from src.models import User, Token, Tweet, Like
+from src.models import Like, Token, Tweet, User
 from src.models.utils import get_password_hash
 from src.routes.tokens import get_current_active_user, oauth2_scheme
 
@@ -30,13 +30,17 @@ async def init_test_data(db):
         user_orm = UserAction(db=db)
         users = await user_orm.get_all()
         if len(users) < 1:
-            users = [User(name='John', hashed_password=get_password_hash('123456'), token=Token(api_key='test')),
-                     User(name="Mike",
-                          hashed_password=get_password_hash('123456'))
-                     ]
+            users = [
+                User(
+                    name="John",
+                    hashed_password=get_password_hash("123456"),
+                    token=Token(api_key="test"),
+                ),
+                User(name="Mike", hashed_password=get_password_hash("123456")),
+            ]
             tweets = [
                 Tweet(tweet_data="Test tweet by John", author=users[0]),
-                Tweet(tweet_data="Some test data", author=users[1])
+                Tweet(tweet_data="Some test data", author=users[1]),
             ]
             db.session.add_all(users)
             db.session.add_all(tweets)
@@ -46,7 +50,6 @@ async def init_test_data(db):
 
 
 class DisableCache(AbstractCache):
-
     def __init__(self, nocache=None):
         self.cache = nocache
 
@@ -77,7 +80,9 @@ async def test_app():
 
     async def get_user(token: str = Depends(oauth2_scheme)):
         user_orm = UserAction(db=SQLSession(session=session))
-        if 'api-key' in token and (usr := await user_orm.get_user_by_api_key(api_key=token[0])):
+        if "api-key" in token and (
+            usr := await user_orm.get_user_by_api_key(api_key=token[0])
+        ):
             return usr
         raise UnAuthorizedError
 

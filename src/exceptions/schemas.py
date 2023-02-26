@@ -1,5 +1,3 @@
-from typing import Type
-
 from pydantic import BaseModel
 
 
@@ -97,7 +95,7 @@ class FileNotImgError(ErrorBase):
         }
 
 
-def get_response_scheme(model: Type[BaseModel], description: str = None):
+def get_response_scheme(model: type[BaseModel], description: str | None = None):
     if not description:
         description = model.__name__
     return {"model": model, "description": description}

@@ -1,9 +1,10 @@
 import os
-import aiofiles
+
+import aiofiles  # type: ignore[import]
 
 
 async def write_to_disk(content: bytes, file_path: str) -> None:
-    async with aiofiles.open(file_path, mode='wb') as f:
+    async with aiofiles.open(file_path, mode="wb") as f:
         await f.write(content)
 
 

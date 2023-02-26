@@ -1,31 +1,26 @@
-import os
-import uuid
-from typing import Sequence
+from collections.abc import Sequence
 
-import aiofiles
-from fastapi import Depends, File
+from fastapi import Depends
 from fastapi.encoders import jsonable_encoder
+from sqlalchemy import Row, delete, select, update
 from sqlalchemy.orm import selectinload
-from sqlalchemy import select, delete, update, Row
 
-from src.config import settings
-from src.models import schemas, Tweet, User, Token, Like, Media
+from src.models import Like, Media, Token, Tweet, User, schemas
+
 from .abstracts import AbstractAction
-from .database import get_db, SQLSession
-
+from .database import SQLSession, get_db
 
 __all__ = (
-    'get_user_action',
-    'get_tweet_action',
-    'get_media_action',
-    'TweetAction',
-    'UserAction',
-    'MediaAction',
+    "get_user_action",
+    "get_tweet_action",
+    "get_media_action",
+    "TweetAction",
+    "UserAction",
+    "MediaAction",
 )
 
 
 class TweetAction(AbstractAction):
-
     def __init__(self, db: SQLSession) -> None:
         self.model = Tweet
         self.db = db
@@ -45,20 +40,27 @@ class TweetAction(AbstractAction):
         return updated_obj
 
     async def remove(self, tweet_id: int) -> bool:
-        stmt = delete(self.model).options(selectinload(self.model.attachments),
-                                          selectinload(self.model.author),
-                                          selectinload(self.model.likes))\
+        stmt = (
+            delete(self.model)
+            .options(
+                selectinload(self.model.attachments),
+                selectinload(self.model.author),
+                selectinload(self.model.likes),
+            )
             .where(self.model.id == tweet_id)
+        )
         stmt_like = delete(Like).where(Like.tweet_id == tweet_id)
         async with self.db as db:
             await db.session.execute(stmt_like)
             await db.session.execute(stmt)
         return True
 
-    def _stmt_get(self) -> 'select':
-        return select(self.model).options(selectinload(self.model.attachments),
-                                          selectinload(self.model.author),
-                                          selectinload(self.model.likes))
+    def _stmt_get(self) -> "select":
+        return select(self.model).options(
+            selectinload(self.model.attachments),
+            selectinload(self.model.author),
+            selectinload(self.model.likes),
+        )
 
     async def get(self, tweet_id: int) -> Tweet | None:
         stmt = self._stmt_get().where(self.model.id == tweet_id)
@@ -80,9 +82,7 @@ class TweetAction(AbstractAction):
     async def remove_like(self, user_id: int, tweet_id: int) -> None:
         async with self.db as db:
             query = await db.session.execute(
-                select(Like)
-                .filter(Like.user_id == user_id,
-                        Like.tweet_id == tweet_id)
+                select(Like).filter(Like.user_id == user_id, Like.tweet_id == tweet_id)
             )
             like = query.scalars().first()
             await db.session.delete(like)
@@ -95,7 +95,6 @@ class TweetAction(AbstractAction):
 
 
 class UserAction(AbstractAction):
-
     def __init__(self, db: SQLSession):
         self.model = User
         self.db = db
@@ -123,11 +122,13 @@ class UserAction(AbstractAction):
         return True
 
     def _stmt_get(self):
-        return select(self.model).options(selectinload(self.model.followed),
-                                          selectinload(self.model.followers),
-                                          selectinload(self.model.likes),
-                                          selectinload(self.model.tweets),
-                                          selectinload(self.model.likes))
+        return select(self.model).options(
+            selectinload(self.model.followed),
+            selectinload(self.model.followers),
+            selectinload(self.model.likes),
+            selectinload(self.model.tweets),
+            selectinload(self.model.likes),
+        )
 
     async def get(self, user_id: int) -> User | None:
         stmt = self._stmt_get().where(self.model.id == user_id)
@@ -142,7 +143,11 @@ class UserAction(AbstractAction):
         return result.scalars().all()
 
     async def get_user_by_api_key(self, api_key: str) -> User:
-        stmt = self._stmt_get().join(Token, Token.user_id == User.id).where(Token.api_key == api_key)
+        stmt = (
+            self._stmt_get()
+            .join(Token, Token.user_id == User.id)
+            .where(Token.api_key == api_key)
+        )
         async with self.db as db:
             result = await db.session.execute(stmt)
         user = result.scalars().first()
@@ -173,7 +178,6 @@ class UserAction(AbstractAction):
 
 
 class MediaAction(AbstractAction):
-
     def __init__(self, db: SQLSession):
         self.model = Media
         self.db = db
@@ -185,7 +189,11 @@ class MediaAction(AbstractAction):
         return image
 
     async def update(self, tweet: Tweet) -> None:
-        stmt = update(self.model).where(self.model.id.in_(tweet.tweet_media_ids)).values({"tweet_id": tweet.id})
+        stmt = (
+            update(self.model)
+            .where(self.model.id.in_(tweet.tweet_media_ids))
+            .values({"tweet_id": tweet.id})
+        )
         async with self.db as db:
             await db.session.execute(stmt)
 
@@ -216,4 +224,3 @@ def get_media_action(db: SQLSession = Depends(get_db)):
 
 def get_tweet_action(db: SQLSession = Depends(get_db)):
     return TweetAction(db=db)
-

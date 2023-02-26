@@ -12,7 +12,7 @@ COPY conf.d/nginx.conf /etc/nginx/nginx.conf
 COPY uwsgi.ini /etc/uwsgi/uwsgi.ini
 
 COPY ./requirements.txt /code/
-RUN pip install --upgrade pip && pip install -r requirements.txt
+RUN pip install --upgrade pip && pip install -r requirements.txt --no-cache-dir
 
 COPY . /code
 

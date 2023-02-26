@@ -3,16 +3,15 @@ from pathlib import Path
 
 from pydantic import BaseSettings
 
-
 BASE_DIR = Path(__file__).parent.parent
 
 env_path = os.path.join(BASE_DIR, os.getenv("CONFIG_FILE", ".env.default"))
 
 
 class App(BaseSettings):
-    DEBUG: bool = True
-    TITLE: str = "FastAPI"
-    DESCRIPTION: str = ""
+    DEBUG: bool
+    TITLE: str = "Tweetter Clone"
+    DESCRIPTION: str = "Microblogs service"
     VERSION: str = "1.0"
 
     SECRET_KEY: str = "09d25e094faa6ca2556c818166b7a9563b93f7099f6f0f4caa6cf63b88e8d3e7"
@@ -20,10 +19,10 @@ class App(BaseSettings):
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
     COUNT_IMAGES: int = 5
     CREATE_TEST_USERS: bool = True
-    ALLOWED_FILES: list[str] = ['png', 'jpg', 'jpeg']
+    ALLOWED_FILES: list[str] = ["png", "jpg", "jpeg"]
     MAX_IMG_SIZE_MB: int = 3
-    CACHE_TWEET_PREFIX: str = 'tweets'
-    CACHE_USER_PREFIX: str = 'users'
+    CACHE_TWEET_PREFIX: str = "tweets"
+    CACHE_USER_PREFIX: str = "users"
     ORIGINS: list[str] = []
 
     class Config:
@@ -52,8 +51,8 @@ class Redisconfig(BaseSettings):
 class RabbitMQ(BaseSettings):
     RABBIT_HOST: str
     RABBIT_PORT: int
-    RABBIT_USER: str = "guest"
-    RABBIT_PASSWORD: str = "guest"
+    RABBIT_USER: str
+    RABBIT_PASSWORD: str
 
     class Config:
         env_file: str = env_path
@@ -72,8 +71,8 @@ class Settings(BaseSettings):
     CACHE_URL: str = f"redis://{Redis.REDIS_HOST}"
     CELERY_BROKER_URL: str = f"amqp://{RabbitMQ.RABBIT_USER}:{RabbitMQ.RABBIT_PASSWORD}@{RabbitMQ.RABBIT_HOST}/"
 
-    STATIC_DIR = os.path.join(str(BASE_DIR), 'static')
-    UPLOADS_DIR = os.path.join('static', 'images')
+    STATIC_DIR = os.path.join(str(BASE_DIR), "static")
+    UPLOADS_DIR = os.path.join("static", "images")
     MAX_SIZE = App.MAX_IMG_SIZE_MB * 1024**2
 
 

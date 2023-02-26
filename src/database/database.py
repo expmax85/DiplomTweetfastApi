@@ -1,15 +1,10 @@
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
-from sqlalchemy.ext.declarative import declarative_base
 
 from src.config import settings
+
 from .abstracts import AbstractAsyncSession
 
-
-__all__ = (
-    'SQLSession',
-    'engine',
-    'get_db'
-)
+__all__ = ("SQLSession", "engine", "get_db")
 
 engine = create_async_engine(settings.DATABASE_URL)
 async_session = AsyncSession(bind=engine, expire_on_commit=False)
