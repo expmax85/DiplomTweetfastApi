@@ -5,13 +5,13 @@ services:
     container_name: app_main
     build:
       context: .
-      dockerfile: Dockerfile
+      dockerfile: Dockerfile_dev
     environment:
       CONFIG_FILE: "test.env"
     entrypoint:
       sh -c "
       alembic upgrade head &&
-      PYTHONASYNCIODEBUG=1 pytest
+      pytest
       "
     volumes:
       - .:/code
@@ -19,8 +19,6 @@ services:
       - "${APP_PORT}:8000"
     depends_on:
       web_db:
-        condition: service_healthy
-      web_redis:
         condition: service_healthy
     networks:
       - web_net
@@ -36,7 +34,7 @@ services:
       - ./data/db:/var/lib/postgresql/data
       - ./init-database.sh:/docker-entrypoint-initdb.d/init-database.sh
     environment:
-      CONFIG_FILE: "test.env.test"
+      CONFIG_FILE: "test.env"
       POSTGRES_USER: ${DB_USER}
       POSTGRES_PASSWORD: ${DB_PASSWORD}
     networks:
@@ -46,25 +44,6 @@ services:
       interval: 10s
       timeout: 10s
       retries: 30
-
-  web_redis:
-    container_name: main_redis
-    image: redis:latest
-    entrypoint:
-      sh -c "redis-server"
-    expose:
-      - 6380
-    ports:
-      - "${REDIS_PORT}:6380"
-    environment:
-      CONFIG_FILE: "test.env.test"
-    networks:
-      - web_net
-    healthcheck:
-        test: [ "CMD", "redis-cli", "ping" ]
-        interval: 10s
-        timeout: 10s
-        retries: 30
 
 networks:
   web_net:

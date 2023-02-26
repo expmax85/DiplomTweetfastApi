@@ -24,7 +24,7 @@ class CustomAuth2(OAuth2PasswordBearer):
         authorization = request.headers.get("Authorization")
         scheme, param = get_authorization_scheme_param(authorization)
         if not authorization or scheme.lower() != "bearer":
-            raise UnAuthorizedError()
+            raise UnAuthorizedError
         else:
             return param
 
@@ -61,7 +61,9 @@ def create_access_token(data: dict, expires_delta: timedelta | None = None) -> s
 
 async def get_current_user(token: str = Depends(oauth2_scheme)) -> User | None:
     if 'api-key' in token:
-        return await get_user(api_key=token[0])
+        if not (user := await get_user(api_key=token[0])):
+            raise UnAuthorizedError
+        return user
 
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,

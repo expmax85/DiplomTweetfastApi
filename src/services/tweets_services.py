@@ -56,7 +56,7 @@ class TweetService(Service):
                                        key=key_gen(self.cache_key_prefix, tweet_id))
         return result
 
-    async def update(self, tweet_id: int, data: schemas.TweetUpdate) -> dict:
+    async def update(self, tweet_id: int, data: schemas.TweetUpdate) -> dict | None:
         updated_tweet = await self.action.update(tweet_id=tweet_id, data=data)
         await self.cache.delete_cache(key=key_gen(self.cache_key_prefix, tweet_id))
         return updated_tweet
