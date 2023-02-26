@@ -1,63 +1,121 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, File, UploadFile
 from starlette import status
-from src.database.cruds import create_image, TweetAction
 
-from src.database.cruds import get_tweet_service
-from src.models import schemas, User
-from src.models.utils import to_json
-from src.routes.users import get_user
+from src.exceptions import get_response_scheme
+from src.exceptions import schemas as exc_schemes
+from src.models import User, schemas
+from src.routes.tokens import get_current_active_user
+from src.services import TweetService, get_tweet_service
 
-router = APIRouter()
-
-
-@router.post("/tweets", response_model=schemas.TweetSuccess, status_code=status.HTTP_201_CREATED)
-async def create_tweet(tweet: schemas.TweetCreate, tweet_service: TweetAction = Depends(get_tweet_service),
-                       user: User = Depends(get_user)):
-    tweet = tweet_service.create(obj_in=tweet, user_id=user.id)
-    # tweet.attachments.append(image)
-    # db.commit()
-    # db.refresh(user)
-    print(tweet)
-    return {"result": True, "tweet_id": tweet.id}
+router = APIRouter(
+    tags=["Tweets"],
+    responses={401: get_response_scheme(model=exc_schemes.Unauthorized)},
+)
 
 
-# @router.post("/medias", response_model=None)
-# async def add_media(media: UploadFile = File(...)):
-#     path = os.path.join(settings.UPLOADS_DIR, media.filename)
-#     with open(path, "wb") as wf:
-#         shutil.copyfileobj(media.file, wf)
-#         media.file.close()
-#         path = f'/static/images/{media.filename}'
-#         image = create_image(session=db, file=str(path))
-#     return {"result": True, "media_id": image.id}
+@router.post(
+    "/tweets",
+    response_model=schemas.TweetSuccess,
+    status_code=status.HTTP_201_CREATED,
+    responses={409: get_response_scheme(model=exc_schemes.CreateTweetError)},
+)
+async def create_tweet(
+    new_tweet: schemas.TweetCreate,
+    tweet_service: TweetService = Depends(get_tweet_service),
+    user: User = Depends(get_current_active_user),
+):
+    """Create new tweet.
+
+    - **tweet** - data creating tweet in json format with keys 'tweet_data' - tweet test message,
+    'tweet_media_ids' - not required, media_ids list for tweet images."""
+    return await tweet_service.create(data=new_tweet, user_id=user.id)
 
 
-@router.delete("/tweets/{tweet_id}", response_model=schemas.Success)
-def remove_tweet(tweet_id: int, tweet_service: TweetAction = Depends(get_tweet_service), user: User = Depends(get_user)):
-    tweet = tweet_service.get(id_obj=tweet_id)
-    if tweet.is_author(user):
-        tweet_service.remove(id_obj=tweet_id)
-        return {"result": True}
-    raise HTTPException(detail='error', status_code=status.HTTP_405_METHOD_NOT_ALLOWED)
+@router.post(
+    "/medias",
+    response_model=schemas.MediaSuccess,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(get_current_active_user)],
+    responses={400: get_response_scheme(model=exc_schemes.SizeImgError)},
+)
+async def add_media(
+    file: UploadFile = File(...),
+    tweet_service: TweetService = Depends(get_tweet_service),
+):
+    """Uploading tweet images.
+
+    - **file** - uploading image file"""
+    return await tweet_service.add_media(file=file)
 
 
+@router.delete(
+    "/tweets/{tweet_id}",
+    response_model=schemas.Success,
+    status_code=status.HTTP_202_ACCEPTED,
+    responses={
+        404: get_response_scheme(model=exc_schemes.TweetNotExist),
+        403: get_response_scheme(model=exc_schemes.NotAllowedError),
+    },
+)
+async def remove_tweet(
+    tweet_id: int,
+    tweet_service: TweetService = Depends(get_tweet_service),
+    user: User = Depends(get_current_active_user),
+):
+    """Remove tweet.
 
-@router.post("/tweets/{tweet_id}/likes", response_model=schemas.Success)
-def create_like(tweet_id: int, tweet_service: TweetAction = Depends(get_tweet_service), user: User = Depends(get_user)):
-    tweet_service.create_like(tweet_id=tweet_id, user_id=user.id)
-    return {"result": True}
+    - **tweet_id** - id by removing tweet"""
+    return await tweet_service.remove(tweet_id=tweet_id, user=user)
 
 
-@router.delete("/tweets/{tweet_id}/likes", response_model=schemas.Success)
-def remove_like(tweet_id: int, tweet_service: TweetAction = Depends(get_tweet_service), user: User = Depends(get_user)):
-    tweet_service.remove_like(tweet_id=tweet_id, user_id=user.id)
-    return {"result": True}
+@router.post(
+    "/tweets/{tweet_id}/likes",
+    response_model=schemas.Success,
+    responses={404: get_response_scheme(model=exc_schemes.TweetNotExist)},
+)
+async def create_like(
+    tweet_id: int,
+    tweet_service: TweetService = Depends(get_tweet_service),
+    user: User = Depends(get_current_active_user),
+):
+    """Like tweet.
+
+    - **tweet_id** - id by liking tweet"""
+    return await tweet_service.create_like(tweet_id=tweet_id, user_id=user.id)
 
 
-@router.get("/tweets")
-def get_tweets(tweet_service: TweetAction = Depends(get_tweet_service)):
-    tweets = tweet_service.get_all()
-    tweets = schemas.Tweets(result=True, tweets=tweets)
-    tweets = to_json(tweets)
-    print(tweets)
-    return tweets
+@router.delete(
+    "/tweets/{tweet_id}/likes",
+    response_model=schemas.Success,
+    responses={404: get_response_scheme(model=exc_schemes.TweetNotExist)},
+)
+async def remove_like(
+    tweet_id: int,
+    tweet_service: TweetService = Depends(get_tweet_service),
+    user: User = Depends(get_current_active_user),
+):
+    """Dislike tweet.
+
+    - **tweet_id** - id by disliking tweet"""
+    return await tweet_service.remove_like(tweet_id=tweet_id, user_id=user.id)
+
+
+public_router = APIRouter(tags=["Public"])
+
+
+@public_router.get("/tweets", response_model=schemas.TweetsResponse)
+async def get_tweets(
+    skip: int = 0,
+    limit: int = 100,
+    tweet_service: TweetService = Depends(get_tweet_service),
+):
+    """Get all tweets. Authenticate is not required"""
+    return await tweet_service.get_all(skip=skip, limit=limit)
+
+
+@public_router.get("/tweets/{tweet_id}", response_model=schemas.TweetResponse)
+async def get_tweet(
+    tweet_id: int, tweet_service: TweetService = Depends(get_tweet_service)
+):
+    """Get tweet. Authenticate is not required"""
+    return await tweet_service.get(tweet_id=tweet_id)

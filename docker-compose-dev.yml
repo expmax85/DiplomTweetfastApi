@@ -1,0 +1,118 @@
+version: "3.9"
+
+services:
+  web_app:
+    container_name: app_dev
+    build:
+      context: .
+      dockerfile: Dockerfile_dev
+    environment:
+      CONFIG_FILE: "dev.env"
+    entrypoint:
+      sh -c "
+      alembic upgrade head &&
+      uvicorn src.main:app --host 0.0.0.0 --reload
+      "
+    volumes:
+      - .:/code
+    ports:
+      - "${APP_PORT}:8000"
+    depends_on:
+      web_db:
+        condition: service_healthy
+      web_redis:
+        condition: service_healthy
+    networks:
+      - web_net
+
+  celery:
+    build:
+      context: .
+      dockerfile: Dockerfile_celery
+    command: celery -A src.celery.celery_app worker --loglevel=info
+    environment:
+      CONFIG_FILE: "dev.env"
+    networks:
+      - web_net
+    volumes:
+      - .:/code
+    depends_on:
+      - web_app
+      - web_rabbitmq
+      - web_redis
+
+  web_db:
+    container_name: db_main
+    image: postgres:15.1-alpine
+    expose:
+      - 5432
+    ports:
+      - "${DB_PORT}:5432"
+    volumes:
+      - ./data/db:/var/lib/postgresql/data
+      - ./postgres/init-database.sh:/docker-entrypoint-initdb.d/init-database.sh
+    environment:
+      CONFIG_FILE: "dev.env"
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    networks:
+      - web_net
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -d ${DB_NAME} -U ${DB_USER}"]
+      interval: 10s
+      timeout: 10s
+      retries: 30
+
+  web_redis:
+    container_name: main_redis
+    image: redis:latest
+    entrypoint:
+      sh -c "redis-server"
+    expose:
+      - 6380
+    ports:
+      - "${REDIS_PORT}:6380"
+    environment:
+      CONFIG_FILE: "dev.env"
+    networks:
+      - web_net
+    healthcheck:
+        test: [ "CMD", "redis-cli", "ping" ]
+        interval: 10s
+        timeout: 10s
+        retries: 30
+
+  web_rabbitmq:
+    container_name: main_rabbitmq
+    image: rabbitmq:3.11.8-alpine
+    restart: always
+    expose:
+      - 5672
+    ports:
+      - "${RABBIT_PORT}:5672"
+    environment:
+      CONFIG_FILE: "dev.env"
+    networks:
+      - web_net
+    healthcheck:
+        test: rabbitmq-diagnostics -q ping
+        interval: 10s
+        timeout: 10s
+        retries: 30
+
+  flower:
+    image: mher/flower:latest
+    environment:
+      CELERY_BROKER_URL: amqp://${RABBIT_USER}:${RABBIT_PASSWORD}@${RABBIT_HOST}:${RABBIT_PORT}//
+      FLOWER_PORT: ${FLOWER_PORT}
+      FLOWER_BASIC_AUTH: "${FLOWER_USER}:${FLOWER_PASSWORD}"
+    ports:
+      - "${FLOWER_PORT}:5555"
+    depends_on:
+      - celery
+    networks:
+      - web_net
+
+networks:
+  web_net:
+    name: web_net
