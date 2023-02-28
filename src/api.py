@@ -1,3 +1,5 @@
+import logging
+
 from fastapi import FastAPI
 from starlette.requests import Request
 from starlette.responses import JSONResponse
@@ -14,9 +16,16 @@ app_api.include_router(tokens.router)
 app_api.include_router(tweets.public_router)
 
 
+logger = logging.getLogger('unknown_errors')
+handler = logging.FileHandler(filename='unexpected_error.log', mode='a')
+handler.setLevel(logging.ERROR)
+logger.addHandler(handler)
+
+
 @app_api.exception_handler(Exception)
 async def unicorn_exception_handler(request: Request, exc: Exception):
     if not isinstance(exc, BaseCustomExc):
+        logger.exception(exc)
         return JSONResponse(
             status_code=404,
             content={

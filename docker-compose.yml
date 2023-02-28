@@ -12,7 +12,7 @@ services:
     entrypoint:
       sh -c "
       alembic upgrade head &&
-      gunicorn src.main:app -k uvicorn.workers.UvicornWorker --bind 0.0.0.0:80 --forwarded-allow-ips='*'
+      gunicorn src.main:app --log-config log.conf -w 4 -k uvicorn.workers.UvicornWorker --bind 0.0.0.0:80 --forwarded-allow-ips='*'
       "
     volumes:
       - .:/code
@@ -25,11 +25,17 @@ services:
         condition: service_healthy
     networks:
       - web_net
+    logging:
+      driver: "fluentd"
+      options:
+        fluentd-address: localhost:24224
+        tag: gunicorn.app
 
   celery:
     build:
       context: .
       dockerfile: Dockerfile_celery
+    container_name: main_celery
     command: celery -A src.celery.celery_app worker --loglevel=info
     environment:
       CONFIG_FILE: ".env"
@@ -43,7 +49,7 @@ services:
       - web_redis
 
   web_db:
-    container_name: db_main
+    container_name: main_pg
     image: postgres:15.1-alpine
     expose:
       - 5432
@@ -103,6 +109,7 @@ services:
 
   flower:
     image: mher/flower:latest
+    container_name: main_flower
     environment:
       CELERY_BROKER_URL: amqp://${RABBIT_USER}:${RABBIT_PASSWORD}@${RABBIT_HOST}:${RABBIT_PORT}//
       FLOWER_PORT: ${FLOWER_PORT}
@@ -113,6 +120,55 @@ services:
       - celery
     networks:
       - web_net
+
+  elasticsearch:
+    image: elasticsearch:8.0.0
+    container_name: efk_elasticsearch
+    volumes:
+      - type: bind
+        source: ./elasticsearch/config/elasticsearch.yml
+        target: /usr/share/elasticsearch/config/elasticsearch.yml
+        read_only: true
+    ports:
+      - "9200:9200"
+      - "9300:9300"
+    environment:
+      ES_JAVA_OPTS: "-Xmx256m -Xms256m"
+      ELASTIC_PASSWORD: changeme
+      discovery.type: single-node
+    networks:
+      - web_net
+
+  fluentd:
+    build: ./fluentd
+    container_name: efk_fluentd
+    volumes:
+      - ./fluentd/conf:/fluentd/etc
+    links:
+      - "elasticsearch"
+    ports:
+      - "24224:24224"
+      - "24224:24224/udp"
+    depends_on:
+      - elasticsearch
+      - kibana
+    networks:
+      - web_net
+
+  kibana:
+    image: kibana:8.0.0
+    container_name: efk_kibana
+    volumes:
+      - type: bind
+        source: ./kibana/config/kibana.yml
+        target: /usr/share/kibana/config/kibana.yml
+        read_only: true
+    ports:
+      - "5601:5601"
+    networks:
+      - web_net
+    depends_on:
+      - elasticsearch
 
 networks:
   web_net:

@@ -1,5 +1,6 @@
 import asyncio
 import base64
+import time
 
 from celery import Celery
 from src.config import settings
@@ -12,6 +13,8 @@ celery_app.conf.broker_url = settings.CELERY_BROKER_URL
 
 @celery_app.task(name="load_file")
 def load_file(data: str, filename: str) -> dict:
+    if settings.App.CREATE_TEST_USERS:
+        time.sleep(15)
     decoded_contents = base64.b64decode(data)
     asyncio.run(write_to_disk(decoded_contents, filename))
     return {"result": "File uploading to server"}
