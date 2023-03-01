@@ -40,7 +40,10 @@ class TweetService(Service):
         obj_in_data = jsonable_encoder(data)
         if len(obj_in_data.get("tweet_media_ids")):
             if not await self._check_exist_media(obj_in_data.get("tweet_media_ids")):
-                raise CreateTweetError
+                if settings.App.CREATE_TEST_USERS:
+                    raise Exception
+                else:
+                    raise CreateTweetError
         tweet = await self.action.create(data=obj_in_data, user_id=user_id)
         if data.tweet_media_ids:
             await self.media_action.update(tweet=tweet)

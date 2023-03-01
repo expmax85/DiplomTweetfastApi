@@ -9,7 +9,7 @@ from src.api import app_api
 from src.config import settings
 from src.database.utils import create_users
 
-app = FastAPI(title="main")
+app = FastAPI(title="main", debug=settings.App.DEBUG)
 
 app.mount("/api", app_api, name="api")
 app.mount("/static", StaticFiles(directory="static"), name="static")
