@@ -2,7 +2,7 @@ from collections.abc import Sequence
 
 from fastapi import Depends
 from fastapi.encoders import jsonable_encoder
-from sqlalchemy import Row, delete, select, update
+from sqlalchemy import Row, delete, select, update, func
 from sqlalchemy.orm import selectinload
 
 from src.models import Like, Media, Token, Tweet, User, schemas
@@ -18,6 +18,8 @@ __all__ = (
     "UserAction",
     "MediaAction",
 )
+
+from ..models.models import Follower
 
 
 class TweetAction(AbstractAction):
@@ -92,6 +94,17 @@ class TweetAction(AbstractAction):
         async with self.db as db:
             result = await db.session.execute(stmt)
         return bool(result.scalars().all())
+
+    async def rss_popular(self, user_id: int) -> Sequence[Row]:
+        stmt = self._stmt_get()\
+            .join(Follower, Follower.follower_id == user_id)\
+            .join(Like, Like.tweet_id == self.model.id)\
+            .where(self.model.user_id == Follower.followed_id)\
+            .group_by(self.model.id)\
+            .order_by(func.count(self.model.likes).desc())
+        async with self.db as db:
+            result = await db.session.execute(stmt)
+        return result.scalars().all()
 
 
 class UserAction(AbstractAction):

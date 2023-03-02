@@ -100,6 +100,12 @@ async def remove_like(
     return await tweet_service.remove_like(tweet_id=tweet_id, user_id=user.id)
 
 
+@router.get("/tweets/rss", response_model=schemas.TweetsResponse)
+async def rss_get(user: User = Depends(get_current_active_user),
+                  tweet_service: TweetService = Depends(get_tweet_service)):
+    return await tweet_service.rss(user_id=user.id)
+
+
 public_router = APIRouter(tags=["Public"])
 
 

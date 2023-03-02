@@ -131,6 +131,12 @@ class TweetService(Service):
         await self.cache.delete_cache(key=key_gen(self.cache_key_prefix, tweet_id))
         return self.success_response
 
+    async def rss(self, user_id: int) -> dict:
+        tweets = await self.action.rss_popular(user_id=user_id)
+        tweets = schemas.TweetsSerialize(tweets=tweets)
+        result = _to_json(tweets.dict())
+        return result
+
 
 def get_tweet_service(
     action: TweetAction = Depends(get_tweet_action),
