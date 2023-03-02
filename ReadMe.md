@@ -1,5 +1,14 @@
 # Сервис микроблогов
 
+![](https://img.shields.io/badge/python-3.11-blue?style=flat-square)
+![](https://img.shields.io/badge/fastAPI-0.92.0-blue)
+![](https://img.shields.io/badge/sqlalchemy-2.0.3-blue)
+![](https://img.shields.io/badge/database-postgreSQL-yellow)
+![](https://img.shields.io/badge/docker-3.9-blue)
+[![pre-commit](https://img.shields.io/badge/pre--commit-enabled-brightgreen?logo=pre-commit)](https://github.com/pre-commit/pre-commit)
+![Code Climate maintainability](https://img.shields.io/codeclimate/maintainability/expmax85/DiplomTweetfastApi)
+![](https://img.shields.io/badge/swagger-valid-brightgreen)
+![](https://img.shields.io/badge/license-MIT-green)
 ## Легенда
 Для корпоративного сервиса микроблогов необходимо реализовать бэкенд
 приложения. 
@@ -79,11 +88,23 @@ sudo docker compose -f docker-compose-test.yml --env-file test.env up
 4. В режиме деплоя
 Создать файл `.env`,заполнив его по образцу `env.template`, и выполнить команду:
 ```bash
-sudo docker compose --env-file .env up
+sudo docker compose --env-file .env up -d
 ```
 
 ## Openapi (Swagger)
 ### Документация OpenAPI:
 ```
 /api/docs
+```
+
+## Flower
+Для отслеживания работы celery используется flower. Для входа, необходимо подключиться по корневому адресу проекта с портом, указанным в настройках (по умолчанию 5555), например:
+```
+http://127.0.0.1:5555/
+```
+
+## EFK-стек
+К проекту подключены средства профилирования и логгирования EFK. Для входа в систему необходимо необходимо подключиться по корневому адресу проекта с портом, указанным в настройках kibana (по умолчанию 5601), например:
+```
+http://127.0.0.1:5601/
 ```
