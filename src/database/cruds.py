@@ -5,7 +5,7 @@ from fastapi.encoders import jsonable_encoder
 from sqlalchemy import Row, delete, select, update, func
 from sqlalchemy.orm import selectinload
 
-from src.models import Like, Media, Token, Tweet, User, schemas
+from src.models import Like, Media, Token, Tweet, User, Follower, schemas
 
 from .abstracts import AbstractAction
 from .database import SQLSession, get_db
@@ -18,8 +18,6 @@ __all__ = (
     "UserAction",
     "MediaAction",
 )
-
-from ..models.models import Follower
 
 
 class TweetAction(AbstractAction):

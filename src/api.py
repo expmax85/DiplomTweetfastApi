@@ -1,3 +1,5 @@
+import sentry_sdk
+
 from fastapi import FastAPI
 from starlette.requests import Request
 from starlette.responses import JSONResponse
@@ -5,6 +7,12 @@ from starlette.responses import JSONResponse
 from src.config import settings
 from src.exceptions import BaseCustomExc, logger
 from src.routes import tokens, tweets, users
+
+
+sentry_sdk.init(
+    dsn=settings.App.SENTRY_DSN,
+    traces_sample_rate=1.0,
+)
 
 app_api = FastAPI(debug=settings.App.DEBUG,
                   title=settings.App.TITLE,

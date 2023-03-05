@@ -1,7 +1,7 @@
 from sqlalchemy import ARRAY, Boolean, ForeignKey, Integer, String
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
-__all__ = ("Base", "Tweet", "Like", "User", "Media", "Token")
+__all__ = ("Base", "Tweet", "Like", "User", "Media", "Token", "Follower")
 
 
 class Base(DeclarativeBase):
